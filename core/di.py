@@ -18,9 +18,12 @@ class DIContainer:
         - Поддержку как синглтонов, так и transient-сервисов
 
         Пример использования:
-            >>> container = DIContainer.get_instance()
-            >>> container.register('event_bus', EventBus, is_singleton=True)
-            >>> bus = container.resolve('event_bus')
+            # 1. Получаем экземпляр контейнера
+             container = DIContainer.get_instance()
+            # 2. Регистрируем сервис
+             container.register('event_bus', EventBus, is_singleton=True)
+            # 3. Получаем экземпляр сервиса
+             bus = container.resolve('event_bus')
     """
     _instance = None  # Статическое поле для хранения экземпляра
 
@@ -52,13 +55,10 @@ class DIContainer:
 
     def resolve(self, name):
         """Создает и возвращает экземпляр сервиса с внедренными зависимостями.
-
         Args:
             name (str): Имя зарегистрированного сервиса
-
         Returns:
             object: Экземпляр запрошенного сервиса
-
         Raises:
             ValueError: Если сервис не зарегистрирован
         """
@@ -87,14 +87,13 @@ class DIContainer:
             }
             return service(**dependencies)
         return service  # Если это уже экземпляр
+
     # понять почему медод _get_constructor_params должен быть статическим(нужно это мне)
 
     def _get_constructor_params(self, cls):
         """Получение параметров конструктора класса.
-
         Args:
             cls: Класс, параметры конструктора которого нужно проанализировать
-
         Returns:
             List[str]: Список имен обязательных параметров конструктора
     """
