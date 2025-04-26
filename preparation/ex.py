@@ -16,35 +16,37 @@ class SidePanel(QWidget):
         self._init_ui()
         self._init_position_menu()
         self._setup_screen_edge_docking()
-        
+
         self.file_watcher = QFileSystemWatcher()
         self.file_watcher.fileChanged.connect(self._on_file_changed)
         self.current_file = None
 
     def _init_ui(self):
         self.setMinimumWidth(300)
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # NEW: Добавляем панель с кнопками управления
+        # Панель с кнопками управления
         self.title_bar = QWidget()
         title_layout = QHBoxLayout(self.title_bar)
         title_layout.setContentsMargins(5, 2, 5, 2)
 
-        # NEW: Кнопка сворачивания
+        # Кнопка сворачивания
         self.minimize_btn = QPushButton("—")
         self.minimize_btn.setFixedSize(20, 20)
         self.minimize_btn.clicked.connect(self.showMinimized)
 
-        # NEW: Кнопка закрытия
+        # Кнопка закрытия
         self.close_btn = QPushButton("×")
         self.close_btn.setFixedSize(20, 20)
         self.close_btn.clicked.connect(self.close)
 
-        # NEW: Добавляем растягивающийся элемент между кнопками и заголовком
+        # Растягивающийся элемент между кнопками и заголовком
         title_layout.addWidget(self.minimize_btn)
         title_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
         title_layout.addWidget(self.close_btn)
+
+        main_layout.addWidget(self.title_bar)
 
         self.splitter = QSplitter(Qt.Vertical)
         self.tree_view = QTreeView()
@@ -56,25 +58,25 @@ class SidePanel(QWidget):
         
         self.splitter.addWidget(self.tree_view)
         self.splitter.addWidget(self.content_view)
-        self.layout.addWidget(self.splitter)
+        main_layout.addWidget(self.splitter)
 
-        # NEW: Добавляем обработку перемещения окна за заголовок
-        def mousePressEvent(self, event):
-            if event.button() == Qt.LeftButton and event.y() < 30:  # Проверяем клик в области заголовка
-                self.drag_start_position = event.globalPosition().toPoint()
-                self.drag_window_position = self.pos()
-                event.accept()
+    # Обработчики событий мыши для перемещения окна
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and event.y() < 30:  # Проверяем клик в области заголовка
+            self.drag_start_position = event.globalPosition().toPoint()
+            self.drag_window_position = self.pos()
+            event.accept()
 
-        def mouseMoveEvent(self, event):
-            if hasattr(self, 'drag_start_position'):
-                delta = event.globalPosition().toPoint() - self.drag_start_position
-                self.move(self.drag_window_position + delta)
-                event.accept()
+    def mouseMoveEvent(self, event):
+        if hasattr(self, 'drag_start_position'):
+            delta = event.globalPosition().toPoint() - self.drag_start_position
+            self.move(self.drag_window_position + delta)
+            event.accept()
 
-        def mouseReleaseEvent(self, event):
-            if hasattr(self, 'drag_start_position'):
-                del self.drag_start_position
-                event.accept()
+    def mouseReleaseEvent(self, event):
+        if hasattr(self, 'drag_start_position'):
+            del self.drag_start_position
+            event.accept()
 
     def _on_tree_item_clicked(self, index):
         """Обработка клика по элементу дерева"""
@@ -176,7 +178,7 @@ class SidePanel(QWidget):
         self.float_action.setChecked(self.dock_position == "float")
 
     def show_context_menu(self, pos):
-        self.position_menu.exec_(self.mapToGlobal(pos))
+        self.position_menu.exec(self.mapToGlobal(pos))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
