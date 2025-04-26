@@ -5,68 +5,118 @@ from PySide6.QtWidgets import (QSplitter, QTreeView, QTextEdit, QWidget,
 from PySide6.QtCore import Qt, QFileSystemWatcher, Signal, QObject, QDir, QRect
 from PySide6.QtGui import QAction, QScreen
 
+#Класс для обработки сигналов панели
 class SidePanelSignals(QObject):
+    #Сигнал при выборе файла (передает путь к файлу)
     file_selected = Signal(str)
+    #Сигнал при изминении файла(передает путь к измененному файлу)
     file_changed = Signal(str)
 
+# Основной класс боковой панели
 class SidePanel(QWidget):
     def __init__(self, parent=None):
+        # Инициализация QWidget с параметрами:
+        # - Без рамки (FramelessWindowHint)
+        # - Всегда поверх других окон (WindowStaysOnTopHint)
         super().__init__(parent, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+
+        # Создаем экземпляр класса для сигналов
         self.signals = SidePanelSignals()
+
+        # Инициализация пользовательского интерфейса
         self._init_ui()
+
+        # Инициализация контекстного меню для управления позицией
         self._init_position_menu()
+
+        # Настройка прикрепления к краям экрана
         self._setup_screen_edge_docking()
 
+        # Наблюдатель за изменениями файлов
         self.file_watcher = QFileSystemWatcher()
+        # Подключаем обработчик изменений файлов
         self.file_watcher.fileChanged.connect(self._on_file_changed)
-        self.current_file = None
+        # Текущий выбранный файл (хранит путь)
+        self.current_file = None # Инициализация переменной
 
+    # Метод инициализации пользовательского интерфейса
     def _init_ui(self):
+        # Устанавливаем минимальную ширину панели
         self.setMinimumWidth(300)
+
+        # Создаем основной вертикальный layout
         main_layout = QVBoxLayout(self)
+        # Убираем отступы у layout
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Панель с кнопками управления
+        # Создаем панель заголовка с кнопками управления
         self.title_bar = QWidget()
+        # Горизонтальный layout для панели заголовка
         title_layout = QHBoxLayout(self.title_bar)
+        # Устанавливаем небольшие отступы для панели заголовка
         title_layout.setContentsMargins(5, 2, 5, 2)
 
         # Кнопка сворачивания
         self.minimize_btn = QPushButton("—")
+        # Фиксированный размер кнопки
         self.minimize_btn.setFixedSize(20, 20)
+        # Подключаем действие сворачивания окна
         self.minimize_btn.clicked.connect(self.showMinimized)
 
         # Кнопка закрытия
         self.close_btn = QPushButton("×")
+        # Фиксированный размер кнопки
         self.close_btn.setFixedSize(20, 20)
+        # Подключаем действие закрытия окна
         self.close_btn.clicked.connect(self.close)
 
         # Растягивающийся элемент между кнопками и заголовком
+        # Добавляем кнопки в layout заголовка:
+        # 1. Кнопка сворачивания
         title_layout.addWidget(self.minimize_btn)
+        # 2. Растягивающийся элемент (пустое пространство)
         title_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        # 3. Кнопка закрытия
         title_layout.addWidget(self.close_btn)
 
+        # Добавляем панель заголовка в основной layout
         main_layout.addWidget(self.title_bar)
 
+        # Создаем разделитель с вертикальной ориентацией
         self.splitter = QSplitter(Qt.Vertical)
+
+        # Создаем дерево для отображения файловой системы
         self.tree_view = QTreeView()
+        # Скрываем заголовки у дерева
         self.tree_view.setHeaderHidden(True)
+        # Подключаем обработчик клика по элементам дерева
         self.tree_view.clicked.connect(self._on_tree_item_clicked)
-        
+
+        # Создаем текстовое поле для отображения содержимого файлов
         self.content_view = QTextEdit()
+        # Делаем текстовое поле только для чтения
         self.content_view.setReadOnly(True)
-        
+
+        # Добавляем виджеты в разделитель:
+        # 1. Дерево файлов (верхняя часть)
         self.splitter.addWidget(self.tree_view)
+        # 2. Текстовое поле (нижняя часть)
         self.splitter.addWidget(self.content_view)
+        # Добавляем разделитель в основной layout
         main_layout.addWidget(self.splitter)
 
-    # Обработчики событий мыши для перемещения окна
+    # Обработчик нажатия кнопки мыши (для перемещения окна)
     def mousePressEvent(self, event):
+        # Если нажата левая кнопка мыши в области заголовка (верхние 30 пикселей)
         if event.button() == Qt.LeftButton and event.y() < 30:  # Проверяем клик в области заголовка
+            # Запоминаем начальную позицию курсора
             self.drag_start_position = event.globalPosition().toPoint()
+            # Запоминаем текущую позицию окна
             self.drag_window_position = self.pos()
+            # Принимаем событие
             event.accept()
 
+    # Обработчик перемещения мыши (для перемещения окна)
     def mouseMoveEvent(self, event):
         if hasattr(self, 'drag_start_position'):
             delta = event.globalPosition().toPoint() - self.drag_start_position
