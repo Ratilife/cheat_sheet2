@@ -118,80 +118,118 @@ class SidePanel(QWidget):
 
     # Обработчик перемещения мыши (для перемещения окна)
     def mouseMoveEvent(self, event):
+        # Если начата операция перетаскивания
         if hasattr(self, 'drag_start_position'):
+            # Вычисляем смещение курсора
             delta = event.globalPosition().toPoint() - self.drag_start_position
+            # Перемещаем окно на вычисленное смещение
             self.move(self.drag_window_position + delta)
+            # Принимаем событие
             event.accept()
 
+    # Обработчик отпускания кнопки мыши (завершение перемещения)
     def mouseReleaseEvent(self, event):
+        # Если была операция перетаскивания
         if hasattr(self, 'drag_start_position'):
+            # Удаляем временные данные
             del self.drag_start_position
+            # Принимаем событие
             event.accept()
 
+    # Обработчик клика по элементу дерева
     def _on_tree_item_clicked(self, index):
         """Обработка клика по элементу дерева"""
+        # Получаем модель данных
         model = index.model()
+        # Проверяем, есть ли у модели метод filePath
         if hasattr(model, 'filePath'):
+            # Получаем путь к выбранному файлу
             file_path = model.filePath(index)
+            # Сохраняем текущий файл
             self.current_file = file_path
+            # Отправляем сигнал о выборе файла
             self.signals.file_selected.emit(file_path)
             
             # Добавляем файл в наблюдатель
+            # Если есть наблюдаемые файлы, очищаем список
             if self.file_watcher.files():
                 self.file_watcher.removePaths(self.file_watcher.files())
+            # Добавляем новый файл в наблюдатель
             self.file_watcher.addPath(file_path)
 
+    # Обработчик изменения файла
     def _on_file_changed(self, path):
         """Обработка изменения файла"""
+        # Если измененный файл - текущий выбранный файл
         if path == self.current_file:
+            # Отправляем сигнал об изменении файла
             self.signals.file_changed.emit(path)
 
+    # Метод для установки модели данных в дерево
     def set_tree_model(self, model):
         """Установка модели для дерева"""
         self.tree_view.setModel(model)
+        # Раскрываем все узлы дерева
         self.tree_view.expandAll()
 
+    # Метод для установки текстового содержимого
     def set_content(self, text):
         """Установка текстового содержимого"""
         self.content_view.setPlainText(text)
 
+    # Метод для установки Markdown содержимого
     def set_markdown_content(self, markdown_text):
         """Установка Markdown содержимого"""
         self.content_view.setMarkdown(markdown_text)
 
+    # Метод для очистки панели
     def clear(self):
         """Очистка панели"""
+        # Очищаем модель дерева
         self.tree_view.setModel(None)
+        # Очищаем текстовое поле
         self.content_view.clear()
+        # Если есть наблюдаемые файлы, очищаем список
         if self.file_watcher.files():
             self.file_watcher.removePaths(self.file_watcher.files())
+        # Сбрасываем текущий файл
         self.current_file = None
 
+    # Метод настройки прикрепления к краям экрана
     def _setup_screen_edge_docking(self):
         """Настройка прикрепления к краям экрана"""
+        # Позиция по умолчанию - слева
         self.dock_position = "left"  # left/right/float
+        # Отступ от края экрана
         self.dock_margin = 5
+        # Обновляем позицию
         self.update_dock_position()
+        # Устанавливаем прозрачность окна
         self.setWindowOpacity(0.9)
-        
+
+    # Метод обновления позиции панели
     def update_dock_position(self):
         """Обновление позиции относительно края экрана"""
+        # Получаем геометрию экрана
         screen = QApplication.primaryScreen().availableGeometry()
+        # Если панель должна быть слева
         if self.dock_position == "left":
             self.setGeometry(QRect(
-                screen.left() + self.dock_margin,
-                screen.top(),
-                300,
-                screen.height()
+                screen.left() + self.dock_margin, # X координата
+                screen.top(),                     # Y координата
+                300,                              # Ширина
+                screen.height()                   # Высота
             ))
+        # Если панель должна быть справа
         elif self.dock_position == "right":
             self.setGeometry(QRect(
-                screen.right() - 300 - self.dock_margin,
-                screen.top(),
-                300,
-                screen.height()
+                screen.right() - 300 - self.dock_margin,    # X координата
+                screen.top(),                               # Y координата
+                300,                                        # Ширина
+                screen.height()                             # Высота
             ))
 
+    # Метод инициализации контекстного меню
     def _init_position_menu(self):
         self.position_menu = QMenu("Позиция панели", self)
         
