@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 from PySide6.QtWidgets import (QSplitter, QTreeView, QTextEdit, QWidget, 
                               QVBoxLayout, QApplication, QFileSystemModel, QMenu,
                               QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog
@@ -148,7 +149,6 @@ class StructureListener(STFileListener):
             if hasattr(ctx, 'STRING') and ctx.STRING():
                 name = ctx.STRING(0).getText()[1:-1]  # Удаляем кавычки
             elif hasattr(ctx, 'templateHeader') and ctx.templateHeader():
-                # Обработка шаблона
                 return
 
             new_item = {
@@ -156,25 +156,34 @@ class StructureListener(STFileListener):
                 'type': 'folder',
                 'children': []
             }
+            if not self.stack:  # Если стек пуст, восстанавливаем корневой элемент
+                self.stack = [self.result]
             self.stack[-1]['children'].append(new_item)
             self.stack.append(new_item)
         except Exception as e:
             print(f"Ошибка при обработке entry: {str(e)}")
+
     def exitEntry(self, ctx):
         """Выход из элемента (папки)"""
-        if ctx.getChildCount() > 3:
-            self.stack.pop()  # Возвращаемся на предыдущий уровень
+        if len(self.stack) > 1 and ctx.getChildCount() > 3:  # Проверяем, что в стеке больше одного элемента
+            self.stack.pop()
 
     def enterTemplateHeader(self, ctx):
         """Обработка шаблона"""
-        name = ctx.STRING(0).getText()[1:-1]  # Имя шаблона
-        # Содержимое из 5-го параметра (индекс 4)
-        content = ctx.STRING(4).getText()[1:-1] if len(ctx.STRING) > 4 else ""
+
+        if not self.stack:  # Если стек пуст, выходим
+            return
+
+        # Получаем все строковые токены
+        strings = [s.getText()[1:-1] for s in ctx.STRING()]
+        name = strings[0] if strings else ""  # Имя из первого токена
+        content = strings[4] if len(strings) > 4 else ""  # Контент из пятого токена
+
         self.stack[-1]['children'].append({
             'name': name,
             'type': 'template',
             'content': content
-        })
+            })
 
 
 # ===================================================================
@@ -191,12 +200,15 @@ class SidePanelSignals(QObject):
 # Основной класс боковой панели
 class SidePanel(QWidget):
     def __init__(self, parent=None):
+
         # Инициализация QWidget с параметрами:
         # - Без рамки (FramelessWindowHint)
         # - Всегда поверх других окон (WindowStaysOnTopHint)
         super().__init__(parent, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         # Создаем экземпляр класса для сигналов
         self.signals = SidePanelSignals()
+        self.file_watcher = QFileSystemWatcher()  # Инициализация наблюдателя
+        self.file_watcher.fileChanged.connect(self._on_file_changed)  # Подключение сигнала
         # Инициализация пользовательского интерфейса
         self._init_ui()
         # Инициализация контекстного меню для управления позицией
@@ -205,6 +217,12 @@ class SidePanel(QWidget):
         self._setup_screen_edge_docking()
         # Текущий выбранный файл (хранит путь)
         self.current_file = None # Инициализация переменной
+
+        self._update_menu_checks()
+
+        # Загружаем сохраненные файлы при старте
+        self._load_saved_files()
+
 
     # Метод инициализации пользовательского интерфейса
     def _init_ui(self):
@@ -287,6 +305,65 @@ class SidePanel(QWidget):
         # 3. Добавляем разделитель в основной layout
         main_layout.addWidget(self.splitter)
 
+        # Настраиваем контекстное меню для дерева
+        self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree_view.customContextMenuRequested.connect(self._show_tree_context_menu)
+
+    #Обработка сохраненя и загрузки файлов st
+    def _get_save_path(self):
+        """Возвращает путь к файлу сохранения"""
+        return os.path.join(os.path.dirname(__file__), "saved_files.json")
+
+    def _save_files_to_json(self):
+        """Сохраняет список загруженных файлов в JSON"""
+        save_path = self._get_save_path()
+        files = []
+
+        # Собираем пути всех загруженных файлов
+        for i in range(self.tree_model.root_item.child_items.count()):
+            item = self.tree_model.root_item.child_items[i]
+            if item.item_data[1] == "file":
+                files.append(item.item_data[2])  # Путь к файлу
+
+        # Сохраняем в JSON
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(files, f, ensure_ascii=False, indent=4)
+
+    def _load_saved_files(self):
+        """Загружает сохраненные файлы из JSON"""
+        save_path = self._get_save_path()
+        if not os.path.exists(save_path):
+            return
+
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                files = json.load(f)
+                for file_path in files:
+                    if os.path.exists(file_path):
+                        self.tree_model.add_file(file_path)
+        except Exception as e:
+            print(f"Ошибка при загрузке сохраненных файлов: {e}")
+
+    def _remove_file_from_json(self, file_path):
+        """Удаляет файл из сохраненного списка"""
+        save_path = self._get_save_path()
+        if not os.path.exists(save_path):
+            return
+
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                files = json.load(f)
+
+            # Удаляем файл из списка
+            if file_path in files:
+                files.remove(file_path)
+
+                # Сохраняем обновленный список
+                with open(save_path, 'w', encoding='utf-8') as f:
+                    json.dump(files, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"Ошибка при удалении файла из сохраненных: {e}")
+
     def _load_st_files(self):
         """Загрузка ST-файлов через диалог"""
         files, _ = QFileDialog.getOpenFileNames(
@@ -298,6 +375,9 @@ class SidePanel(QWidget):
         for file in files:
             self.tree_model.add_file(file)  # Добавляем файлы в модель
 
+            # Сохраняем список файлов
+            self._save_files_to_json()
+
     def _on_tree_item_clicked(self, index):
         """Обработка клика по элементу дерева"""
         item = index.internalPointer()
@@ -306,7 +386,7 @@ class SidePanel(QWidget):
     # Обработчик нажатия кнопки мыши (для перемещения окна)
     def mousePressEvent(self, event):
         # Если нажата левая кнопка мыши в области заголовка (верхние 30 пикселей)
-        if event.button() == Qt.LeftButton and event.y() < 30:  # Проверяем клик в области заголовка
+        if event.button() == Qt.LeftButton and event.position().y() < 30:
             # Запоминаем начальную позицию курсора
             self.drag_start_position = event.globalPosition().toPoint()
             # Запоминаем текущую позицию окна
@@ -393,11 +473,49 @@ class SidePanel(QWidget):
         # Сбрасываем текущий файл
         self.current_file = None
 
+    #Метод удаления файла
+    def remove_file(self, file_path):
+        """Удаляет файл из дерева и из сохраненных данных"""
+        # Находим и удаляем файл из модели
+        for i in range(self.tree_model.root_item.child_items.count()):
+            item = self.tree_model.root_item.child_items[i]
+            if item.item_data[2] == file_path:
+                self.tree_model.beginRemoveRows(QModelIndex(), i, i)
+                self.tree_model.root_item.child_items.pop(i)
+                self.tree_model.endRemoveRows()
+                break
+        # Удаляем из сохраненных данных
+        self._remove_file_from_json(file_path)
+
+        # Если удаляемый файл был текущим, очищаем просмотр
+        if self.current_file == file_path:
+            self.content_view.clear()
+            self.current_file = None
+
+    def _show_tree_context_menu(self, pos):
+        """Показывает контекстное меню для дерева файлов"""
+        index = self.tree_view.indexAt(pos)
+        if not index.isValid():
+            return
+
+        item = index.internalPointer()
+        if item.item_data[1] != "file":
+            return  # Показываем меню только для файлов
+
+        menu = QMenu(self)
+
+        # Действие для удаления файла
+        remove_action = QAction("Удалить из списка", self)
+        remove_action.triggered.connect(lambda: self.remove_file(item.item_data[2]))
+        menu.addAction(remove_action)
+
+        menu.exec(self.tree_view.viewport().mapToGlobal(pos))
+
     # Метод настройки прикрепления к краям экрана
     def _setup_screen_edge_docking(self):
         """Настройка прикрепления к краям экрана"""
-        # Позиция по умолчанию - слева
-        self.dock_position = "left"  # left/right/float
+        # Позиция по умолчанию - справа
+        self.dock_position = "right"  # left/right/float
         # Отступ от края экрана
         self.dock_margin = 5
         # Обновляем позицию
