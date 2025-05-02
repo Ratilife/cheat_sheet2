@@ -204,6 +204,7 @@ class StructureListener(STFileListener):
         self.stack = [{'children': []}]  # Стек для отслеживания вложенности
         self.result = self.stack[0]  # Корневой элемент
         self.root_name = "Root"  # Добавляем поле для имени корневой папки
+        self.found_first_folder = False
 
     def get_structure(self):
         """Возвращает собранную структуру"""
@@ -230,9 +231,13 @@ class StructureListener(STFileListener):
     def enterFolderHeader(self, ctx):
         """Обработка входа в папку"""
         name = ctx.STRING(0).getText()[1:-1]  # Получаем имя папки (первый STRING)
-        # Если это первая папка (корневая), сохраняем её имя
-        if len(self.stack) == 1:  # Корневая папка — единственный элемент в стеке
+
+        # Если это первая папка, сохраняем её имя
+        if not self.found_first_folder:
             self.root_name = name
+            self.found_first_folder = True
+            return  # Выходим, не добавляя в структуру
+
         new_item = {
             'name': name,
             'type': 'folder',
@@ -247,7 +252,7 @@ class StructureListener(STFileListener):
             self.stack.pop()
 
     # Добавляем обработку корневой папки (rootContent)
-    def enterRootContent(self, ctx):
+''' def enterRootContent(self, ctx):
         """Обработка корневой папки (правило rootContent из STFile.g4)"""
         # Получаем имя корневой папки (если есть)
         name = "Root"  # Значение по умолчанию
@@ -267,7 +272,7 @@ class StructureListener(STFileListener):
         """Выход из корневой папки"""
         if len(self.stack) > 1:
             self.stack.pop()
-
+'''
 # ===================================================================
 # ГРАФИЧЕСКИЙ ИНТЕРФЕЙС
 # ===================================================================
