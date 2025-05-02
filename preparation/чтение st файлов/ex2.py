@@ -2,12 +2,12 @@ import sys
 import os
 import json
 from PySide6.QtWidgets import (QSplitter, QTreeView, QTextEdit, QWidget, 
-                              QVBoxLayout, QApplication, QFileSystemModel, QMenu,
-                              QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog
-                              )
-from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject, QDir, QRect,
+                              QVBoxLayout, QApplication, QMenu,
+                              QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog,
+                              QFileIconProvider, QStyledItemDelegate, QStyle)
+from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject,  QRect, QSize,
                             QAbstractItemModel, QModelIndex)
-from PySide6.QtGui import QAction, QScreen
+from PySide6.QtGui import QAction, QIcon, QFont, QColor
 
 # Импорт компонентов ANTLR
 from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
@@ -37,6 +37,7 @@ class STFileTreeModel(QAbstractItemModel):
         super().__init__(parent)
         self.root_item = STFileTreeItem(["Root", "root", ""])  # Корневой элемент
         self.parser = STFileParserWrapper()  # Обертка для парсера
+        self.icon_provider = QFileIconProvider()  # Провайдер иконок
 
     # Основные методы модели
     def index(self, row, column, parent=QModelIndex()):
@@ -70,14 +71,54 @@ class STFileTreeModel(QAbstractItemModel):
         """Количество колонок (фиксировано: Имя и Тип)"""
         return 2
 
-    def data(self, index, role=Qt.DisplayRole):
+    '''def data(self, index, role=Qt.DisplayRole):
         """Возвращает данные для отображения"""
         if not index.isValid() or role != Qt.DisplayRole:
             return None
 
         item = index.internalPointer()
-        return item.item_data[index.column()]
+        return item.item_data[index.column()]'''
 
+    def data(self, index, role=Qt.DisplayRole):
+        """Возвращает данные для отображения"""
+        if not index.isValid():
+            return None
+
+        item = index.internalPointer()
+        column = index.column()
+
+        if role == Qt.DisplayRole:
+            return item.item_data[column]
+
+        elif role == Qt.DecorationRole and column == 0:
+            # Возвращаем иконки для разных типов элементов
+            if item.item_data[1] == "file":
+                return QIcon.fromTheme("text-x-generic")
+            elif item.item_data[1] == "folder":
+                return QIcon.fromTheme("folder")
+            elif item.item_data[1] == "template":
+                return QIcon.fromTheme("text-x-script")
+
+        elif role == Qt.FontRole:
+            # Жирный шрифт для файлов
+            if item.item_data[1] == "file":
+                font = QFont()
+                font.setBold(True)
+                return font
+
+        elif role == Qt.ForegroundRole:
+            # Разные цвета для разных типов элементов
+            if item.item_data[1] == "file":
+                return QColor("#2a82da")
+            elif item.item_data[1] == "folder":
+                return QColor("#6e6e6e")
+            elif item.item_data[1] == "template":
+                return QColor("#3a3a3a")
+
+        elif role == Qt.SizeHintRole:
+            return QSize(0, 24)  # Фиксированная высота строк
+
+        return None
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         """Заголовки колонок"""
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
@@ -286,8 +327,39 @@ class SidePanel(QWidget):
         self.tree_view = QTreeView()
         # Показываем заголовки у дерева
         self.tree_view.setHeaderHidden(False)
+        self.tree_view.setIndentation(12)  # Уменьшаем отступ
+        self.tree_view.setAnimated(True)  # Анимация раскрытия
+        self.tree_view.setUniformRowHeights(True)
+        self.tree_view.setRootIsDecorated(True)  # Показываем декор для корневых элементов
+        self.tree_view.setSortingEnabled(False)
+
+        # Настройка стиля дерева
+        self.tree_view.setStyleSheet("""
+                    QTreeView {
+                        background-color: #f5f5f5;
+                        border: none;
+                        outline: 0;
+                    }
+                    QTreeView::item {
+                        padding: 2px 0;
+                        border: none;
+                    }
+                    QTreeView::item:hover {
+                        background-color: #e0e0e0;
+                    }
+                    QTreeView::item:selected {
+                        background-color: #d0e3ff;
+                        color: #000000;
+                    }
+                    QHeaderView::section {
+                        background-color: #e0e0e0;
+                        padding: 4px;
+                        border: none;
+                    }
+                """)
         # Подключаем обработчик клика по элементам дерева
         self.tree_view.clicked.connect(self._on_tree_item_clicked)
+
 
         # Создаем текстовое поле для отображения содержимого файлов
         self.content_view = QTextEdit()
@@ -320,7 +392,7 @@ class SidePanel(QWidget):
         files = []
 
         # Собираем пути всех загруженных файлов
-        for i in range(self.tree_model.root_item.child_items.count()):
+        for i in range(len(self.tree_model.root_item.child_items)):
             item = self.tree_model.root_item.child_items[i]
             if item.item_data[1] == "file":
                 files.append(item.item_data[2])  # Путь к файлу
@@ -477,7 +549,7 @@ class SidePanel(QWidget):
     def remove_file(self, file_path):
         """Удаляет файл из дерева и из сохраненных данных"""
         # Находим и удаляем файл из модели
-        for i in range(self.tree_model.root_item.child_items.count()):
+        for i in range(len(self.tree_model.root_item.child_items)):
             item = self.tree_model.root_item.child_items[i]
             if item.item_data[2] == file_path:
                 self.tree_model.beginRemoveRows(QModelIndex(), i, i)
