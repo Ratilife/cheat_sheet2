@@ -4,7 +4,7 @@ import json
 from PySide6.QtWidgets import (QSplitter, QTreeView, QTextEdit, QWidget, 
                               QVBoxLayout, QApplication, QMenu,
                               QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog,
-                              QFileIconProvider, QStyledItemDelegate, QStyle)
+                              QFileIconProvider, QStyledItemDelegate, QStyleOptionViewItem, QStyle)
 from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject,  QRect, QSize,
                             QAbstractItemModel, QModelIndex)
 from PySide6.QtGui import QAction, QIcon, QFont, QColor
@@ -26,13 +26,13 @@ class STFileTreeItem:
         self.item_data = data  # [Имя, Тип, Контент]
         self.parent_item = parent  # Родительская ветка
         self.child_items = []  # Дочерние элементы
-
+        # Cвойство для доступа к типу
+        self.type = data[1] if len(data) > 1 else ""
 
 # Модель данных для дерева
 
 class STFileTreeModel(QAbstractItemModel):
     """Модель данных для отображения структуры ST-файлов в дереве"""
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.root_item = STFileTreeItem(["Root", "root", ""])  # Корневой элемент
@@ -101,22 +101,36 @@ class STFileTreeModel(QAbstractItemModel):
 
         elif role == Qt.FontRole:
             # Жирный шрифт для файлов
+            font = QFont()
             if item.item_data[1] == "file":
-                font = QFont()
+                font.setBold(False)
+            elif item.item_data[1] == "folder":
                 font.setBold(True)
-                return font
+            return font
 
         elif role == Qt.ForegroundRole:
             # Разные цвета для разных типов элементов
             if item.item_data[1] == "file":
                 return QColor("#2a82da")
             elif item.item_data[1] == "folder":
-                return QColor("#6e6e6e")
+                return QColor("#006400")            # Темно-зеленый для папок
             elif item.item_data[1] == "template":
-                return QColor("#3a3a3a")
+                return QColor("#00008B")            # Темно-синий для шаблонов
 
         elif role == Qt.SizeHintRole:
             return QSize(0, 24)  # Фиксированная высота строк
+
+        # Добавляем пользовательскую роль для определения уровня вложенности
+        elif role == Qt.UserRole + 1:
+            level = 0
+            parent = item.parent_item
+            while parent and parent != self.root_item:
+                level += 1
+                parent = parent.parent_item
+            return level
+        # Добавляем роль для установки типа элемента (для CSS селекторов)
+        elif role == Qt.UserRole + 2:
+            return item.item_data[1]  # Возвращаем тип элемента
 
         return None
     def headerData(self, section, orientation, role=Qt.DisplayRole):
@@ -127,12 +141,17 @@ class STFileTreeModel(QAbstractItemModel):
 
     def add_file(self, file_path):
         """Добавляет новый ST-файл в модель"""
+        listener = StructureListener()  # Создаем listener перед парсингом
+        self.parser.listener = listener  # Передаем listener в парсер (если нужно)
+
         structure = self.parser.parse_st_file(file_path)  # Парсим файл
-        file_name = os.path.basename(file_path)
+
+        # Используем имя корневой папки из listener
+        root_name = listener.root_name  # Будет "Новый1" для вашего файла
 
         # Начинаем вставку данных
         self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
-        file_item = STFileTreeItem([file_name, "file", file_path], self.root_item)
+        file_item = STFileTreeItem([root_name, "file", file_path], self.root_item)
         self._build_tree(structure, file_item)  # Строим поддерево
         self.root_item.child_items.append(file_item)
         self.endInsertRows()
@@ -160,54 +179,27 @@ class STFileParserWrapper:
         parser = STFileParser(token_stream)  # Парсер
         tree = parser.fileStructure()  # Дерево разбора
 
-        # Собираем структуру данных
-        listener = StructureListener()
+        listener = StructureListener()  # Создаем listener здесь
         ParseTreeWalker().walk(listener, tree)
-        return listener.get_structure()
+
+        # Возвращаем и структуру, и имя корневой папки
+        return {
+            'structure': listener.get_structure(),
+            'root_name': listener.root_name
+        }
 
 
 class StructureListener(STFileListener):
     """Слушатель для построения структуры данных из дерева разбора"""
-
     def __init__(self):
         self.stack = [{'children': []}]  # Стек для отслеживания вложенности
         self.result = self.stack[0]  # Корневой элемент
+        self.root_name = "Root"  # Добавляем поле для имени корневой папки
 
     def get_structure(self):
         """Возвращает собранную структуру"""
         return self.result['children']
 
-    def enterEntry(self, ctx):
-        """Обработка входа в элемент (папку)"""
-        try:
-            # Проверяем наличие строковых токенов
-            strings = [s for s in dir(ctx) if 'STRING' in s]
-            if not strings:
-                return
-
-            # Более безопасный способ получить имя
-            name = ""
-            if hasattr(ctx, 'STRING') and ctx.STRING():
-                name = ctx.STRING(0).getText()[1:-1]  # Удаляем кавычки
-            elif hasattr(ctx, 'templateHeader') and ctx.templateHeader():
-                return
-
-            new_item = {
-                'name': name,
-                'type': 'folder',
-                'children': []
-            }
-            if not self.stack:  # Если стек пуст, восстанавливаем корневой элемент
-                self.stack = [self.result]
-            self.stack[-1]['children'].append(new_item)
-            self.stack.append(new_item)
-        except Exception as e:
-            print(f"Ошибка при обработке entry: {str(e)}")
-
-    def exitEntry(self, ctx):
-        """Выход из элемента (папки)"""
-        if len(self.stack) > 1 and ctx.getChildCount() > 3:  # Проверяем, что в стеке больше одного элемента
-            self.stack.pop()
 
     def enterTemplateHeader(self, ctx):
         """Обработка шаблона"""
@@ -226,10 +218,79 @@ class StructureListener(STFileListener):
             'content': content
             })
 
+    def enterFolderHeader(self, ctx):
+        """Обработка входа в папку"""
+        name = ctx.STRING(0).getText()[1:-1]  # Получаем имя папки (первый STRING)
+        # Если это первая папка (корневая), сохраняем её имя
+        if len(self.stack) == 1:  # Корневая папка — единственный элемент в стеке
+            self.root_name = name
+        new_item = {
+            'name': name,
+            'type': 'folder',
+            'children': []
+        }
+        self.stack[-1]['children'].append(new_item)
+        self.stack.append(new_item)
+
+    def exitFolderHeader(self, ctx):
+        """Выход из папки"""
+        if len(self.stack) > 1:
+            self.stack.pop()
+
+    # Добавляем обработку корневой папки (rootContent)
+    def enterRootContent(self, ctx):
+        """Обработка корневой папки (правило rootContent из STFile.g4)"""
+        # Получаем имя корневой папки (если есть)
+        name = "Root"  # Значение по умолчанию
+        if ctx.int_value():  # Если есть числовое значение (например, ID папки)
+            pass  # Можно добавить логику обработки
+
+        # Создаем элемент корневой папки
+        root_item = {
+            'name': name,
+            'type': 'folder',  # Или другой тип, если нужно
+            'children': []
+        }
+        self.stack[-1]['children'].append(root_item)
+        self.stack.append(root_item)
+
+    def exitRootContent(self, ctx):
+        """Выход из корневой папки"""
+        if len(self.stack) > 1:
+            self.stack.pop()
 
 # ===================================================================
 # ГРАФИЧЕСКИЙ ИНТЕРФЕЙС
 # ===================================================================
+
+# Добавляем после создания tree_view, но до установки модели
+class TreeItemDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def paint(self, painter, option, index):
+        # Получаем тип элемента и уровень вложенности из модели
+        item_type = index.data(Qt.UserRole + 2)
+        level = index.data(Qt.UserRole + 1)
+
+        # Сохраняем оригинальные параметры отрисовки
+        original_padding = option.rect.left()
+
+        # Увеличиваем отступ в зависимости от уровня вложенности
+        if level is not None and level > 0:
+            indent = level * 15  # 15 пикселей на каждый уровень вложенности
+            option.rect.adjust(indent, 0, 0, 0)
+
+        # Устанавливаем разные стили для разных типов элементов
+        if item_type == "template":
+            # Дополнительный отступ для шаблонов
+            option.rect.adjust(15, 0, 0, 0)
+
+        # Вызываем оригинальный метод paint
+        super().paint(painter, option, index)
+
+        # Восстанавливаем оригинальные параметры
+        option.rect.adjust(-option.rect.left() + original_padding, 0, 0, 0)
 
 #Класс для обработки сигналов панели
 class SidePanelSignals(QObject):
@@ -332,31 +393,38 @@ class SidePanel(QWidget):
         self.tree_view.setUniformRowHeights(True)
         self.tree_view.setRootIsDecorated(True)  # Показываем декор для корневых элементов
         self.tree_view.setSortingEnabled(False)
-
+        # Устанавливаем делегат
+        self.tree_view.setItemDelegate(TreeItemDelegate(self.tree_view))
         # Настройка стиля дерева
         self.tree_view.setStyleSheet("""
-                    QTreeView {
-                        background-color: #f5f5f5;
-                        border: none;
-                        outline: 0;
-                    }
-                    QTreeView::item {
-                        padding: 2px 0;
-                        border: none;
-                    }
-                    QTreeView::item:hover {
-                        background-color: #e0e0e0;
-                    }
-                    QTreeView::item:selected {
-                        background-color: #d0e3ff;
-                        color: #000000;
-                    }
-                    QHeaderView::section {
-                        background-color: #e0e0e0;
-                        padding: 4px;
-                        border: none;
-                    }
-                """)
+            QTreeView {
+                background-color: #f5f5f5;
+                border: none;
+                outline: 0;
+                font-size: 12px;
+            }
+            QTreeView::item {
+                padding: 4px 1px;
+                border: none;
+            }
+            QTreeView::item:hover {
+                background-color: #e0e0e0;
+            }
+            QTreeView::item:selected {
+                background-color: #d0e3ff;
+                color: #000000;
+                border-radius: 2px;
+            }
+            QHeaderView::section {
+                background-color: #e0e0e0;
+                padding: 4px;
+                border: none;
+                font-size: 11px;
+            }
+            QTreeView::branch {
+                margin-right: 5px;
+            }
+        """)
         # Подключаем обработчик клика по элементам дерева
         self.tree_view.clicked.connect(self._on_tree_item_clicked)
 
@@ -413,6 +481,8 @@ class SidePanel(QWidget):
                 for file_path in files:
                     if os.path.exists(file_path):
                         self.tree_model.add_file(file_path)
+            # Раскрываем все узлы после загрузки
+            self.tree_view.expandAll()
         except Exception as e:
             print(f"Ошибка при загрузке сохраненных файлов: {e}")
 
