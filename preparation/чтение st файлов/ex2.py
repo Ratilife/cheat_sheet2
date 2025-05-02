@@ -69,15 +69,8 @@ class STFileTreeModel(QAbstractItemModel):
 
     def columnCount(self, parent=QModelIndex()):
         """Количество колонок (фиксировано: Имя и Тип)"""
-        return 2
+        return 1
 
-    '''def data(self, index, role=Qt.DisplayRole):
-        """Возвращает данные для отображения"""
-        if not index.isValid() or role != Qt.DisplayRole:
-            return None
-
-        item = index.internalPointer()
-        return item.item_data[index.column()]'''
 
     def data(self, index, role=Qt.DisplayRole):
         """Возвращает данные для отображения"""
@@ -136,7 +129,7 @@ class STFileTreeModel(QAbstractItemModel):
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         """Заголовки колонок"""
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return ["Имя", "Тип"][section]
+            return ["Имя"][section]
         return None
 
     def add_file(self, file_path):
@@ -251,28 +244,7 @@ class StructureListener(STFileListener):
         if len(self.stack) > 1:
             self.stack.pop()
 
-    # Добавляем обработку корневой папки (rootContent)
-''' def enterRootContent(self, ctx):
-        """Обработка корневой папки (правило rootContent из STFile.g4)"""
-        # Получаем имя корневой папки (если есть)
-        name = "Root"  # Значение по умолчанию
-        if ctx.int_value():  # Если есть числовое значение (например, ID папки)
-            pass  # Можно добавить логику обработки
 
-        # Создаем элемент корневой папки
-        root_item = {
-            'name': name,
-            'type': 'folder',  # Или другой тип, если нужно
-            'children': []
-        }
-        self.stack[-1]['children'].append(root_item)
-        self.stack.append(root_item)
-
-    def exitRootContent(self, ctx):
-        """Выход из корневой папки"""
-        if len(self.stack) > 1:
-            self.stack.pop()
-'''
 # ===================================================================
 # ГРАФИЧЕСКИЙ ИНТЕРФЕЙС
 # ===================================================================
@@ -434,6 +406,7 @@ class SidePanel(QWidget):
                 padding: 4px;
                 border: none;
                 font-size: 11px;
+                width: 100%;  /* Добавляем это свойство */
             }
             QTreeView::branch {
                 margin-right: 5px;
