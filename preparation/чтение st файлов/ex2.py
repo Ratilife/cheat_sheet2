@@ -141,19 +141,28 @@ class STFileTreeModel(QAbstractItemModel):
 
     def add_file(self, file_path):
         """Добавляет новый ST-файл в модель"""
-        listener = StructureListener()  # Создаем listener перед парсингом
-        self.parser.listener = listener  # Передаем listener в парсер (если нужно)
+        # Получаем результат парсинга, который теперь содержит и структуру, и имя корневой папки
+        result = self.parser.parse_st_file(file_path)
 
-        structure = self.parser.parse_st_file(file_path)  # Парсим файл
+        # Извлекаем имя корневой папки (например, "Новый1")
+        root_name = result['root_name']
 
-        # Используем имя корневой папки из listener
-        root_name = listener.root_name  # Будет "Новый1" для вашего файла
+        # Извлекаем структуру файла для построения дерева
+        structure = result['structure']
 
-        # Начинаем вставку данных
+        # Начинаем вставку данных в модель
         self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
+
+        # Создаем элемент для корневой папки с именем из файла
         file_item = STFileTreeItem([root_name, "file", file_path], self.root_item)
-        self._build_tree(structure, file_item)  # Строим поддерево
+
+        # Строим поддерево на основе структуры файла
+        self._build_tree(structure, file_item)
+
+        # Добавляем элемент в корневую папку модели
         self.root_item.child_items.append(file_item)
+
+        # Завершаем вставку
         self.endInsertRows()
 
     def _build_tree(self, nodes, parent):
