@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QSplitter, QTreeView, QTextEdit, QWidget,
                               QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog,
                               QFileIconProvider, QStyledItemDelegate, QStyleOptionViewItem, QStyle)
 from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject,  QRect, QSize,
-                            QAbstractItemModel, QModelIndex)
+                            QAbstractItemModel, QModelIndex, QEvent )
 from PySide6.QtGui import QAction, QIcon, QFont, QColor
 
 # Импорт компонентов ANTLR
@@ -157,6 +157,7 @@ class STFileTreeModel(QAbstractItemModel):
 
         # Завершаем вставку
         self.endInsertRows()
+        #self.print_tree()
 
     def _build_tree(self, nodes, parent):
         """Рекурсивно строит дерево из данных"""
@@ -166,6 +167,44 @@ class STFileTreeModel(QAbstractItemModel):
             if 'children' in node:
                 self._build_tree(node['children'], item)
 
+    def is_folder(self, index):
+        """Проверяет, является ли элемент папкой"""
+        if not index.isValid():
+            return False
+        item = index.internalPointer()
+        return item.type == "folder"
+
+    def has_children(self, index):
+        """Проверяет, есть ли у элемента дети"""
+        if not index.isValid():
+            return False
+        item = index.internalPointer()
+        return bool(item.child_items)
+
+    def canFetchMore(self, parent):
+        """Проверяет, можно ли загрузить дочерние элементы"""
+        if not parent.isValid():
+            return False
+        item = parent.internalPointer()
+        return bool(item.child_items)
+
+    # необезательный метод создан для проверки данных
+    def print_tree(self, item=None, level=0):
+        """Рекурсивная печать структуры дерева для отладки
+        Args:
+            item: STFileTreeItem - текущий элемент для печати (по умолчанию корневой)
+            level: int - уровень вложенности (для отступов)
+        """
+        item = item or self.root_item
+        print("  " * level + f"- {item.item_data[0]} ({item.type})")
+        for child in item.child_items:
+            self.print_tree(child, level + 1)
+
+    def flags(self, index):
+        """Возвращает флаги для элементов"""
+        if not index.isValid():
+            return Qt.NoItemFlags
+        return Qt.ItemIsEnabled | Qt.ItemIsSelectable
 # ===================================================================
 # КЛАССЫ ДЛЯ ПАРСИНГА ST-ФАЙЛОВ
 # ===================================================================
@@ -253,7 +292,41 @@ class StructureListener(STFileListener):
 class TreeItemDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.parent_view = parent  # Инициализируем parent_view
 
+    '''
+    def editorEvent(self, event, model, option, index):
+        """Обработка событий редактора (клики)"""
+        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            style = option.widget.style() if option.widget else QApplication.style()
+            branch_rect = style.subElementRect(
+                QStyle.SE_TreeViewDisclosureItem,
+                option,
+                option.widget
+            )
+            # Проверяем, был ли клик по декорации (треугольнику)
+            if branch_rect and branch_rect.contains(event.position().toPoint()):
+                if model.is_folder(index) and model.has_children(index):
+                    view = self.parent()
+                    if view.isExpanded(index):
+                        view.collapse(index)
+                    else:
+                        view.expand(index)
+                    return True
+        return super().editorEvent(event, model, option, index)
+    '''
+
+    def editorEvent(self, event, model, option, index):
+        """Обработка кликов по элементам дерева"""
+        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            item = index.internalPointer()
+            if item and item.type == "folder":
+                if self.parent_view.isExpanded(index):
+                    self.parent_view.collapse(index)
+                else:
+                    self.parent_view.expand(index)
+                return True
+        return super().editorEvent(event, model, option, index)
     def paint(self, painter, option, index):
         # Получаем тип элемента и уровень вложенности из модели
         item_type = index.data(Qt.UserRole + 2)
@@ -277,6 +350,7 @@ class TreeItemDelegate(QStyledItemDelegate):
 
         # Восстанавливаем оригинальные параметры
         option.rect.adjust(-option.rect.left() + original_padding, 0, 0, 0)
+
 
 #Класс для обработки сигналов панели
 class SidePanelSignals(QObject):
@@ -353,15 +427,30 @@ class SidePanel(QWidget):
         self.load_btn.setFixedSize(20, 20)
         self.load_btn.clicked.connect(self._load_st_files)
 
+        # Добавляем кнопки сворачивания/разворачивания
+        self.collapse_btn = QPushButton("−")
+        self.collapse_btn.setFixedSize(20, 20)
+        self.collapse_btn.setToolTip("Свернуть все")
+        self.collapse_btn.clicked.connect(self.collapse_all)
+
+        self.expand_btn = QPushButton("+")
+        self.expand_btn.setFixedSize(20, 20)
+        self.expand_btn.setToolTip("Развернуть все")
+        self.expand_btn.clicked.connect(self.expand_all)
+
         # Растягивающийся элемент между кнопками и заголовком
         # Добавляем кнопки в layout заголовка:
         # 1. Кнопка сворачивания
         title_layout.addWidget(self.minimize_btn)
         # 2 Добавлена кнопка загрузки
         title_layout.addWidget(self.load_btn)
-        # 3. Растягивающийся элемент (пустое пространство)
+        # 3 Добавляем кнопку сворачивания
+        title_layout.addWidget(self.collapse_btn)
+        # 4 Добавляем кнопку разворачивания
+        title_layout.addWidget(self.expand_btn)
+        # 5. Растягивающийся элемент (пустое пространство)
         title_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        # 4. Кнопка закрытия
+        # 6. Кнопка закрытия
         title_layout.addWidget(self.close_btn)
 
         # Добавляем панель заголовка в основной layout
@@ -378,7 +467,16 @@ class SidePanel(QWidget):
         self.tree_view.setAnimated(True)  # Анимация раскрытия
         self.tree_view.setUniformRowHeights(True)
         self.tree_view.setRootIsDecorated(True)  # Показываем декор для корневых элементов
+        self.tree_view.setExpandsOnDoubleClick(True)  # Включаем разворачивание по двойному клику
         self.tree_view.setSortingEnabled(False)
+
+        # Устанавливаем делегат с правильной ссылкой на tree_view
+        self.delegate = TreeItemDelegate(self.tree_view)
+        self.tree_view.setItemDelegate(self.delegate)
+
+        # Подключаем обработчик двойного клика
+        self.tree_view.doubleClicked.connect(self._on_tree_item_double_clicked)
+
         # Устанавливаем делегат
         self.tree_view.setItemDelegate(TreeItemDelegate(self.tree_view))
         # Настройка стиля дерева
@@ -392,24 +490,15 @@ class SidePanel(QWidget):
             QTreeView::item {
                 padding: 4px 1px;
                 border: none;
+                height: 24px;
             }
-            QTreeView::item:hover {
-                background-color: #e0e0e0;
+            QTreeView::branch:has-children:!has-siblings:closed,
+            QTreeView::branch:closed:has-children:has-siblings {
+                image: url(:/qtreeview/closed);
             }
-            QTreeView::item:selected {
-                background-color: #d0e3ff;
-                color: #000000;
-                border-radius: 2px;
-            }
-            QHeaderView::section {
-                background-color: #e0e0e0;
-                padding: 4px;
-                border: none;
-                font-size: 11px;
-                width: 100%;  /* Добавляем это свойство */
-            }
-            QTreeView::branch {
-                margin-right: 5px;
+            QTreeView::branch:open:has-children:!has-siblings,
+            QTreeView::branch:open:has-children:has-siblings {
+                image: url(:/qtreeview/open);
             }
         """)
         # Подключаем обработчик клика по элементам дерева
@@ -504,14 +593,31 @@ class SidePanel(QWidget):
         for file in files:
             self.tree_model.add_file(file)  # Добавляем файлы в модель
 
+            #self.tree_model.print_tree()
             # Сохраняем список файлов
             self._save_files_to_json()
 
     def _on_tree_item_clicked(self, index):
         """Обработка клика по элементу дерева"""
         item = index.internalPointer()
+        if not item:
+            return
+
+        # Для шаблонов показываем контент
         if item.item_data[1] == 'template':
-            self.content_view.setPlainText(item.item_data[2])  # Показываем контент
+            self.content_view.setPlainText(item.item_data[2])
+
+        # Для файлов добавляем в наблюдатель
+        if item.item_data[1] == 'file':
+            file_path = item.item_data[2]
+            self.current_file = file_path
+            self.signals.file_selected.emit(file_path)
+
+            # Обновляем наблюдатель файлов
+            if self.file_watcher.files():
+                self.file_watcher.removePaths(self.file_watcher.files())
+            self.file_watcher.addPath(file_path)
+
     # Обработчик нажатия кнопки мыши (для перемещения окна)
     def mousePressEvent(self, event):
         # Если нажата левая кнопка мыши в области заголовка (верхние 30 пикселей)
@@ -622,22 +728,62 @@ class SidePanel(QWidget):
             self.current_file = None
 
     def _show_tree_context_menu(self, pos):
-        """Показывает контекстное меню для дерева файлов"""
+        """Показывает контекстное меню для дерева файлов
+            Args:
+            pos: QPoint - позиция курсора мыши при вызове контекстного меню
+        """
+        # Получаем индекс элемента дерева по позиции клика
         index = self.tree_view.indexAt(pos)
+        # Если индекс невалидный (клик мимо элементов), выходим из метода
         if not index.isValid():
             return
 
+        # Получаем объект элемента дерева по индексу
         item = index.internalPointer()
-        if item.item_data[1] != "file":
-            return  # Показываем меню только для файлов
 
+        # Создаем объект контекстного меню
         menu = QMenu(self)
+        # Проверяем тип элемента (не является ли он файлом)
+        if item.item_data[1] != "file":
+            # Действие для удаления файла
+            remove_action = QAction("Удалить из списка", self)
+            # Подключаем обработчик удаления файла
+            remove_action.triggered.connect(lambda: self.remove_file(item.item_data[2]))
+            # Добавляем действие в меню
+            menu.addAction(remove_action)
+        # Если элемент является папкой
+        elif item.item_data[1] == "folder":
+            # Действия для папок
+            expand_action = QAction("Развернуть", self)
+            # Подключаем обработчик разворачивания текущей папки
+            expand_action.triggered.connect(lambda: self.tree_view.expand(index))
+            # Добавляем действие в меню
+            menu.addAction(expand_action)
 
-        # Действие для удаления файла
-        remove_action = QAction("Удалить из списка", self)
-        remove_action.triggered.connect(lambda: self.remove_file(item.item_data[2]))
-        menu.addAction(remove_action)
+            # Создаем действие "Свернуть"
+            collapse_action = QAction("Свернуть", self)
+            # Подключаем обработчик сворачивания текущей папки
+            collapse_action.triggered.connect(lambda: self.tree_view.collapse(index))
+            # Добавляем действие в меню
+            menu.addAction(collapse_action)
 
+            # Добавляем разделитель в меню
+            menu.addSeparator()
+
+            # Создаем действие "Развернуть все вложенные"
+            expand_all_action = QAction("Развернуть все вложенные", self)
+            # Подключаем обработчик рекурсивного разворачивания
+            expand_all_action.triggered.connect(lambda: self._expand_recursive(index))
+            # Добавляем действие в меню
+            menu.addAction(expand_all_action)
+
+            # Создаем действие "Свернуть все вложенные"
+            collapse_all_action = QAction("Свернуть все вложенные", self)
+            # Подключаем обработчик рекурсивного сворачивания
+            collapse_all_action.triggered.connect(lambda: self._collapse_recursive(index))
+            # Добавляем действие в меню
+            menu.addAction(collapse_all_action)
+        # Отображаем контекстное меню в позиции курсора
         menu.exec(self.tree_view.viewport().mapToGlobal(pos))
 
     # Метод настройки прикрепления к краям экрана
@@ -729,6 +875,55 @@ class SidePanel(QWidget):
         # Показываем меню в указанной позиции
         self.position_menu.exec(self.mapToGlobal(pos))
 
+    # Добавляем  методы сворачивание/разворачиване:
+    def collapse_all(self):
+        """Сворачивает все узлы дерева"""
+        self.tree_view.collapseAll()
+
+    def expand_all(self):
+        """Разворачивает все узлы дерева"""
+        self.tree_view.expandAll()
+
+    def _on_tree_item_double_clicked(self, index):
+        """Обработка двойного клика по элементу дерева"""
+        if not index.isValid():
+            return
+
+        item = index.internalPointer()
+        if not item:
+            return
+
+        if item.type == "folder":
+            if self.tree_view.isExpanded(index):
+                self.tree_view.collapse(index)
+            else:
+                self.tree_view.expand(index)
+
+
+    def _expand_recursive(self, index):
+        """Рекурсивно разворачивает папку и все подпапки"""
+        self.tree_view.expand(index)
+        model = index.model()
+        for i in range(model.rowCount(index)):
+            child_index = model.index(i, 0, index)
+            if model.is_folder(child_index):
+                self._expand_recursive(child_index)
+
+    def _collapse_recursive(self, index):
+        """Рекурсивно сворачивает папку и все подпапки"""
+        self.tree_view.collapse(index)
+        model = index.model()
+        for i in range(model.rowCount(index)):
+            child_index = model.index(i, 0, index)
+            if model.is_folder(child_index):
+                self._collapse_recursive(child_index)
+
+    def hasChildren(self, parent=QModelIndex()):
+        """Переопределяем метод для корректного отображения треугольников раскрытия"""
+        if not parent.isValid():
+            return len(self.root_item.child_items) > 0
+        item = parent.internalPointer()
+        return len(item.child_items) > 0
 # ===================================================================
 # ЗАПУСК ПРИЛОЖЕНИЯ
 # ===================================================================
