@@ -384,16 +384,17 @@ class TreeItemDelegate(QStyledItemDelegate):
 
         # Сохраняем оригинальные настройки
         original_rect = option.rect
+
+        # Получаем уровень вложенности
+        level = index.data(Qt.UserRole + 1) or 0
+        indent = level * self.tree_view.indentation()
+
         #2.Подготовка к отрисовке папок:
         # Рисуем кнопку для папок
         if item.type == "folder" and item.child_items:
             #3.Создание области для кнопки:
-            # Получаем уровень вложенности
-            level = index.data(Qt.UserRole + 1) or 0
-            indent = level * self.tree_view.indentation()
-
             button_rect = QRect(
-                original_rect.left() + indent,  # Учитываем отступ
+                original_rect.left() ,  # Учитываем отступ
                 original_rect.top(),
                 22,
                 original_rect.height()
@@ -419,8 +420,12 @@ class TreeItemDelegate(QStyledItemDelegate):
 
             #7.Сдвиг текста:
             # Сдвигаем текст вправо
-            option.rect = original_rect.adjusted(+ 22, 0, 0, 0)
-
+            #option.rect = original_rect.adjusted(indent + 22, 0, 0, 0)
+            # Сдвигаем текст вправо от кнопки
+            option.rect.adjust(22, 0, 0, 0)
+        else:
+            # Для всех элементов (не только папок) добавляем отступ
+            option.rect = original_rect.adjusted(indent, 0, 0, 0)
         # Специальный отступ для шаблонов
         if item.type == "template":
             # Дополнительный отступ для шаблонов
@@ -542,7 +547,7 @@ class SidePanel(QWidget):
         self.tree_view = QTreeView()
         # Показываем заголовки у дерева
         self.tree_view.setHeaderHidden(False)
-        self.tree_view.setIndentation(20)  # Увеличьте это значение
+        self.tree_view.setIndentation(10)  # Увеличьте это значение
         self.tree_view.setAnimated(True)  # Анимация раскрытия
         self.tree_view.setUniformRowHeights(True)
         self.tree_view.setRootIsDecorated(True)  # Показываем декор для корневых элементов
@@ -694,6 +699,14 @@ class SidePanel(QWidget):
         item = index.internalPointer()
         if not item:
             return
+
+        #Тест
+        if item.item_data[1] == 'template' or item.item_data[1] == 'folder':
+            parent = item.parent_item
+            if parent:
+                print(f"Элемент: {item.item_data[0]}, тип: {item.item_data[1]}, Родитель: {parent.item_data[0]}, тип: {parent.item_data[1]}")
+            else:
+                print(f"Элемент: {item.item_data[0]}, Родитель: None")
 
         # Для шаблонов показываем контент
         if item.item_data[1] == 'template':
@@ -969,12 +982,19 @@ class SidePanel(QWidget):
 
     # Добавляем  методы сворачивание/разворачиване:
     def collapse_all(self):
-        """Сворачивает все узлы дерева"""
-        self.tree_view.collapseAll()
+        """Сворачивает все узлы дерева (рекурсивно)"""
+        root = self.tree_model.root_item
+        for i in range(len(root.child_items)):
+            index = self.tree_model.index(i, 0, QModelIndex())
+            self._collapse_recursive(index)
+
 
     def expand_all(self):
-        """Разворачивает все узлы дерева"""
-        self.tree_view.expandAll()
+        """Разворачивает все узлы дерева (рекурсивно)"""
+        root = self.tree_model.root_item
+        for i in range(len(root.child_items)):
+            index = self.tree_model.index(i, 0, QModelIndex())
+            self._expand_recursive(index)
 
     def _on_tree_item_double_clicked(self, index):
         """Обработка двойного клика по элементу дерева"""
@@ -1001,6 +1021,9 @@ class SidePanel(QWidget):
 
     def _expand_recursive(self, index):
         """Рекурсивно разворачивает папку и все подпапки"""
+        if not index.isValid():
+            return
+
         self.tree_view.expand(index)
         model = index.model()
         for i in range(model.rowCount(index)):
