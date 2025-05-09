@@ -44,7 +44,7 @@ class STFileTreeModel(QAbstractItemModel):
         """Создает индекс для элемента"""
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
-        # TODO разабраться тут
+
         parent_item = parent.internalPointer() if parent.isValid() else self.root_item
         child_item = parent_item.child_items[row]
         return self.createIndex(row, column, child_item)
@@ -111,7 +111,7 @@ class STFileTreeModel(QAbstractItemModel):
                 return QColor("#00008B")            # Темно-синий для шаблонов
 
         elif role == Qt.SizeHintRole:
-            return QSize(0, 28)  # Фиксированная высота строк
+            return QSize(0, 24)  # Фиксированная высота строк
 
         # Добавляем пользовательскую роль для определения уровня вложенности
         elif role == Qt.UserRole + 1:
@@ -137,6 +137,9 @@ class STFileTreeModel(QAbstractItemModel):
         # Получаем результат парсинга, который теперь содержит и структуру, и имя корневой папки
         result = self.parser.parse_st_file(file_path)
 
+        print("Parsed structure:")
+        print(json.dumps(result['structure'], indent=2, ensure_ascii=False))
+
         # Извлекаем имя корневой папки (например, "Новый1")
         root_name = result['root_name']
 
@@ -158,6 +161,7 @@ class STFileTreeModel(QAbstractItemModel):
         # Завершаем вставку
         self.endInsertRows()
         #self.print_tree()
+        print(f"Структура из парсера: {json.dumps(structure, indent=2)}")
 
     def _build_tree(self, nodes, parent):
         """Рекурсивно строит дерево из данных"""
@@ -247,9 +251,10 @@ class StructureListener(STFileListener):
     """Слушатель для построения структуры данных из дерева разбора"""
     def __init__(self):
         self.stack = [{'children': []}]  # Стек для отслеживания вложенности
-        self.result = self.stack[0]  # Корневой элемент
-        self.root_name = "Root"  # Добавляем поле для имени корневой папки
-        self.found_first_folder = False
+        self.result = self.stack[0]      # Корневой элемент
+        self.root_name = "Root"          # Имя корневой папки
+        self.first_folder_processed = False
+
 
     def get_structure(self):
         """Возвращает собранную структуру"""
@@ -258,135 +263,74 @@ class StructureListener(STFileListener):
 
     def enterTemplateHeader(self, ctx):
         """Обработка шаблона"""
-
         if not self.stack:  # Если стек пуст, выходим
             return
 
-        # Получаем все строковые токены
         strings = [s.getText()[1:-1] for s in ctx.STRING()]
-        name = strings[0] if strings else ""  # Имя из первого токена
-        content = strings[4] if len(strings) > 4 else ""  # Контент из пятого токена
-
-        self.stack[-1]['children'].append({
-            'name': name,
+        template = {
+            'name': strings[0] if strings else "",
             'type': 'template',
-            'content': content
-            })
-
-    def enterFolderHeader(self, ctx):
-        """Обработка входа в папку"""
-        name = ctx.STRING(0).getText()[1:-1]  # Получаем имя папки (первый STRING)
-
-        # Если это первая папка, сохраняем её имя
-        if not self.found_first_folder:
-            self.root_name = name
-            self.found_first_folder = True
-            return  # Выходим, не добавляя в структуру
-
-        new_item = {
-            'name': name,
-            'type': 'folder',
-            'children': []
+            'content': strings[4] if len(strings) > 4 else ""
         }
-        self.stack[-1]['children'].append(new_item)
-        self.stack.append(new_item)
+        self.stack[-1]['children'].append(template)
 
-    def exitFolderHeader(self, ctx):
-        """Выход из папки"""
-        if len(self.stack) > 1:
-            self.stack.pop()
 
+def enterFolderHeader(self, ctx):
+    """Обработка входа в папку"""
+    name = ctx.STRING(0).getText()[1:-1]  # Получаем имя папки
+
+    # Если это первая папка, сохраняем её имя
+    if not self.first_folder_processed:
+        self.root_name = name
+        self.first_folder_processed = True
+        # Не пропускаем добавление первой папки!
+
+    new_item = {
+        'name': name,
+        'type': 'folder',
+        'children': []
+    }
+    # Добавляем в текущий уровень
+    self.stack[-1]['children'].append(new_item)
+    # Переходим на новый уровень
+    self.stack.append(new_item)
+
+
+def exitFolderHeader(self, ctx):
+    """Выход из папки"""
+    if len(self.stack) > 1:
+        self.stack.pop()
 
 # ===================================================================
 # ГРАФИЧЕСКИЙ ИНТЕРФЕЙС
 # ===================================================================
 
 # Добавляем после создания tree_view, но до установки модели
-
 class TreeItemDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.tree_view = parent
+        self.tree_view = parent  # Сохраняем ссылку на tree_view
+        # Добавляем иконки для кнопок
         self.expand_icon = QIcon.fromTheme("list-add")
         self.collapse_icon = QIcon.fromTheme("list-remove")
-        self.button_size = 16  # Размер кнопки
-
-    def paint(self, painter, option, index):
-        item = index.internalPointer()
-        if not item:
-            return super().paint(painter, option, index)
-
-        # Сохраняем оригинальные настройки
-        original_rect = option.rect
-
-        # Получаем уровень вложенности
-        level = index.data(Qt.UserRole + 1) or 0
-        indent = level * self.tree_view.indentation()
-
-        # Для папок с детьми рисуем кнопку
-        if item.type == "folder" and item.child_items:
-            # Рассчитываем позицию кнопки
-            button_rect = QRect(
-                original_rect.left() + indent,
-                original_rect.top() + (original_rect.height() - self.button_size) // 2,
-                self.button_size,
-                self.button_size
-            )
-
-            # Настраиваем стиль кнопки
-            button_option = QStyleOptionButton()
-            button_option.rect = button_rect
-            button_option.state = QStyle.State_Enabled
-
-            # Выбираем иконку в зависимости от состояния
-            if self.tree_view.isExpanded(index):
-                button_option.icon = self.collapse_icon
-            else:
-                button_option.icon = self.expand_icon
-
-            button_option.iconSize = QSize(12, 12)
-
-            # Рисуем кнопку
-            QApplication.style().drawControl(QStyle.CE_PushButton, button_option, painter)
-
-            # Сдвигаем текст вправо от кнопки
-            option.rect.adjust(self.button_size + 2, 0, 0, 0)
-            # Специальный отступ для шаблонов
-        if item.type == "template":
-                # Дополнительный отступ для шаблонов
-                option.rect.adjust(15, 0, 0, 0)  # Ещё +15px для шаблонов
-        '''else:
-            # Для остальных элементов просто добавляем отступ
-            option.rect = original_rect.adjusted(indent, 0, 0, 0)
-        '''
-        # Оригинальная отрисовка
-        super().paint(painter, option, index)
-
-    def sizeHint(self, option, index):
-        size = super().sizeHint(option, index)
-        item = index.internalPointer()
-        if item and item.type == "folder":
-            size.setWidth(size.width() + 20)  # Добавляем место для кнопки
-        return size
 
     def editorEvent(self, event, model, option, index):
-        if not index.isValid():
-            return False
-
         item = index.internalPointer()
         if not item or item.type != "folder" or not item.child_items:
             return super().editorEvent(event, model, option, index)
 
         # Получаем уровень вложенности
         level = index.data(Qt.UserRole + 1) or 0
-        indent = level * self.tree_view.indentation()
+        if level == 0:  # Пропускаем корневой элемент
+            return super().editorEvent(event, model, option, index)
 
-        # Рассчитываем позицию кнопки
+        # Рассчитываем позицию кнопки с учетом уровня вложенности
+        indent = (level - 1) * self.tree_view.indentation()
         button_rect = QRect(
-            option.rect.left() + indent,
-            option.rect.top() + (option.rect.height() - self.button_size) // 2,
-            self.button_size,
-            self.button_size
+            option.rect.left() + indent,  # Учитываем отступ
+            option.rect.top(),
+            22,
+            option.rect.height()
         )
 
         # Обрабатываем клик
@@ -399,6 +343,81 @@ class TreeItemDelegate(QStyledItemDelegate):
                 return True
 
         return super().editorEvent(event, model, option, index)
+
+    def sizeHint(self, option, index):
+        size = super().sizeHint(option, index)
+        item = index.internalPointer()
+        if item and item.type == "folder" and (index.data(Qt.UserRole + 1) or 0) > 0:
+            size.setWidth(size.width() + 22)  # Добавляем место для кнопки
+        return size
+    # неактуально. Возможно вдальнейшем удаление. Неспользуется
+    '''def paint_old(self, painter, option, index):
+
+        #1. Подготовка данных:
+        # Получаем тип элемента и уровень вложенности из модели
+        item_type = index.data(Qt.UserRole + 2)   # Получаем тип элемента
+        level = index.data(Qt.UserRole + 1)       # Получаем уровень вложенности
+
+        # Сохраняем оригинальные параметры отрисовки
+        original_padding = option.rect.left()
+
+        #2. Настройка отступов:
+        # Увеличиваем отступ в зависимости от уровня вложенности
+        if level is not None and level > 0:
+            indent = level * 15  # 15 пикселей на каждый уровень вложенности
+            option.rect.adjust(indent, 0, 0, 0)  # Сдвигаем только левую границу
+
+        #3. Дополнительная обработка шаблонов:
+        # Устанавливаем разные стили для разных типов элементов
+        if item_type == "template":
+            # Дополнительный отступ для шаблонов
+            option.rect.adjust(15, 0, 0, 0)  # Ещё +15px для шаблонов
+
+        #4. Базовая отрисовка:
+        # Вызываем оригинальный метод paint
+        super().paint(painter, option, index)   # Стандартная отрисовка
+
+        #5. Восстановление состояния:
+        # Восстанавливаем оригинальные параметры
+        option.rect.adjust(-option.rect.left() + original_padding, 0, 0, 0) # Возвращаем прямоугольник в исходное положение
+        '''
+
+    def paint(self, painter, option, index):
+        item = index.internalPointer()
+        if not item:
+            return super().paint(painter, option, index)
+
+        original_rect = option.rect
+        level = index.data(Qt.UserRole + 1) or 0
+        base_indent = (level - 1) * self.tree_view.indentation() if level > 0 else 0
+
+        # Сдвигаем все элементы согласно уровню
+        option.rect = original_rect.adjusted(base_indent, 0, 0, 0)
+
+        # Рисуем кнопку только для папок (кроме корневого уровня)
+        if item.type == "folder" and item.child_items and level > 0:
+            button_rect = QRect(
+                original_rect.left() + base_indent,
+                original_rect.top(),
+                22,
+                original_rect.height()
+            )
+
+            button_option = QStyleOptionButton()
+            button_option.rect = button_rect
+            button_option.state = QStyle.State_Enabled
+            button_option.icon = self.collapse_icon if self.tree_view.isExpanded(index) else self.expand_icon
+            button_option.iconSize = QSize(12, 12)
+
+            QApplication.style().drawControl(QStyle.CE_PushButton, button_option, painter)
+            option.rect.adjust(22, 0, 0, 0)  # Сдвигаем текст после кнопки
+
+        # Дополнительный отступ для шаблонов
+        if item.type == "template":
+            option.rect.adjust(15, 0, 0, 0)
+
+        super().paint(painter, option, index)
+        option.rect = original_rect
 
 #Класс для обработки сигналов панели
 class SidePanelSignals(QObject):
@@ -507,16 +526,20 @@ class SidePanel(QWidget):
         # Создаем разделитель с вертикальной ориентацией
         self.splitter = QSplitter(Qt.Vertical)
 
+        self.splitter.setSizes([300, 100])  # 300px для дерева, 100px для текста
+        self.splitter.setHandleWidth(5)  # Ширина разделителя
+        self.splitter.setStyleSheet("QSplitter::handle { background: #ccc; }")
+
         # Создаем дерево для отображения файловой системы
         self.tree_view = QTreeView()
         # Показываем заголовки у дерева
         self.tree_view.setHeaderHidden(False)
-        self.tree_view.setIndentation(20)  # Уменьшаем стандартный отступ
+        self.tree_view.setIndentation(10)  # Увеличьте это значение
         self.tree_view.setAnimated(True)  # Анимация раскрытия
         self.tree_view.setUniformRowHeights(True)
-        self.tree_view.setRootIsDecorated(False)  # Вкл стандартные треугольники
+        self.tree_view.setRootIsDecorated(True)  # Показываем декор для корневых элементов
         self.tree_view.setExpandsOnDoubleClick(True)  # Включаем разворачивание по двойному клику
-        #self.tree_view.setSortingEnabled(False)
+        self.tree_view.setSortingEnabled(False)
 
         # Устанавливаем делегат с правильной ссылкой на tree_view
         self.delegate = TreeItemDelegate(self.tree_view)
@@ -529,17 +552,14 @@ class SidePanel(QWidget):
         #self.tree_view.setItemDelegate(TreeItemDelegate(self.tree_view))
         # Настройка стиля дерева
         self.tree_view.setStyleSheet("""
-                    QTreeView::branch:has-children:!has-siblings:closed,
-                    QTreeView::branch:closed:has-children:has-siblings {
-                    image: none;
-                    border: none;
-                    }
-                    QTreeView::branch:open:has-children:!has-siblings,
-                    QTreeView::branch:open:has-children:has-siblings {
-                    image: none;
-                    border: none;
-                    }
-        """)
+                                     QTreeView {
+                                     background-color: white;
+                                     border: 1px solid #ddd;
+                                     }
+                                     QTreeView::item {
+                                     padding: 4px;
+                                     }
+                                     """)
         '''self.tree_view.setStyleSheet("""
             QTreeView {
                 background-color: #f5f5f5;
@@ -657,17 +677,17 @@ class SidePanel(QWidget):
     def _load_st_files(self):
         """Загрузка ST-файлов через диалог"""
         files, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Открыть ST-файлы",
-            "",
-            "ST Files (*.st)"
+            self, "Открыть ST-файлы", "", "ST Files (*.st)"
         )
         for file in files:
-            self.tree_model.add_file(file)  # Добавляем файлы в модель
-
-            #self.tree_model.print_tree()
-            # Сохраняем список файлов
+            print(f"Загрузка файла: {file}")  # Логирование
+            self.tree_model.add_file(file)
+            self.tree_model.print_tree()  # Вывод структуры в консоль
             self._save_files_to_json()
+
+        # Принудительное обновление вида
+        self.tree_view.expandAll()
+        self.tree_view.update()
 
     def _on_tree_item_clicked(self, index):
         """Обработка клика по элементу дерева"""
@@ -957,13 +977,19 @@ class SidePanel(QWidget):
 
     # Добавляем  методы сворачивание/разворачиване:
     def collapse_all(self):
-        """Сворачивает все узлы дерева """
-        self.tree_view.collapseAll()
+        """Сворачивает все узлы дерева (рекурсивно)"""
+        root = self.tree_model.root_item
+        for i in range(len(root.child_items)):
+            index = self.tree_model.index(i, 0, QModelIndex())
+            self._collapse_recursive(index)
 
 
     def expand_all(self):
-        """Разворачивает все узлы дерева"""
-        self.tree_view.expandAll()
+        """Разворачивает все узлы дерева (рекурсивно)"""
+        root = self.tree_model.root_item
+        for i in range(len(root.child_items)):
+            index = self.tree_model.index(i, 0, QModelIndex())
+            self._expand_recursive(index)
 
     def _on_tree_item_double_clicked(self, index):
         """Обработка двойного клика по элементу дерева"""
@@ -975,10 +1001,17 @@ class SidePanel(QWidget):
             return
 
         if item.type == "folder":
-            if self.tree_view.isExpanded(index):
-                self.tree_view.collapse(index)
-            else:
-                self.tree_view.expand(index)
+            # Игнорируем двойной клик, если он был на кнопке
+            pos = self.tree_view.viewport().mapFromGlobal(QCursor.pos())
+            button_rect = QRect(self.tree_view.visualRect(index).left(),
+                                self.tree_view.visualRect(index).top(),
+                                20,
+                                self.tree_view.visualRect(index).height())
+            if not button_rect.contains(pos):
+                if self.tree_view.isExpanded(index):
+                    self.tree_view.collapse(index)
+                else:
+                    self.tree_view.expand(index)
 
 
     def _expand_recursive(self, index):
