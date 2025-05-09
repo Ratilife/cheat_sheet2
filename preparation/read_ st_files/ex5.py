@@ -11,6 +11,7 @@ from PySide6.QtGui import QAction, QIcon, QFont, QColor, QCursor
 
 # Импорт компонентов ANTLR
 from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
+from antlr4.error.ErrorListener import ErrorListener
 from ANTLR4.st_Files.STFileLexer import STFileLexer
 from ANTLR4.st_Files.STFileParser import STFileParser
 from ANTLR4.st_Files.STFileListener import STFileListener
@@ -232,79 +233,81 @@ class STFileTreeModel(QAbstractItemModel):
 # ===================================================================
 
 class STFileParserWrapper:
-    """Обертка для парсера ANTLR"""
-
     def parse_st_file(self, file_path):
-        """Основной метод парсинга файла"""
         input_stream = FileStream(file_path, encoding="utf-8")
-        lexer = STFileLexer(input_stream)  # Лексер
-        token_stream = CommonTokenStream(lexer)  # Поток токенов
-        parser = STFileParser(token_stream)  # Парсер
-        tree = parser.fileStructure()  # Дерево разбора
+        lexer = STFileLexer(input_stream)
+        tokens = CommonTokenStream(lexer)
+        parser = STFileParser(tokens)
 
-        listener = StructureListener()  # Создаем listener здесь
+        # Устанавливаем обработчик ошибок
+        parser.removeErrorListeners()
+        parser.addErrorListener(ExceptionErrorListener())
+
+        tree = parser.fileStructure()
+        listener = StructureListener()
         ParseTreeWalker().walk(listener, tree)
 
-        # Возвращаем и структуру, и имя корневой папки
         return {
             'structure': listener.get_structure(),
             'root_name': listener.root_name
         }
 
 
+class ExceptionErrorListener(ErrorListener):
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        raise Exception(f"Ошибка парсинга в строке {line}:{column} - {msg}")
+
 class StructureListener(STFileListener):
-    """Слушатель для построения структуры данных из дерева разбора"""
     def __init__(self):
-        self.stack = [{'children': []}]  # Стек для отслеживания вложенности
-        self.result = self.stack[0]  # Корневой элемент
-        self.root_name = "Root"  # Добавляем поле для имени корневой папки
-        self.found_first_folder = False
+        self.stack = [{'children': []}]
+        self.current_parent = self.stack[0]
+        self.root_name = "Unnamed"
+        self.found_root = False
 
     def get_structure(self):
-        """Возвращает собранную структуру"""
-        return self.result['children']
+        return self.stack[0]['children']
 
+    def enterFileStructure(self, ctx):
+        # Обработка корневого уровня файла
+        if not self.found_root:
+            # Ищем первое вхождение folderHeader для имени корня
+            for child in ctx.getChildren():
+                if hasattr(child, 'folderHeader'):
+                    folder_ctx = child.folderHeader()
+                    if folder_ctx:
+                        self.root_name = folder_ctx.STRING(0).getText()[1:-1]
+                        self.found_root = True
+                        break
 
-    def enterTemplateHeader(self, ctx):
-        """Обработка шаблона"""
+    def enterEntry(self, ctx):
+        if ctx.folderHeader():
+            # Обработка папки
+            header = ctx.folderHeader()
+            name = header.STRING(0).getText()[1:-1]
+            new_item = {
+                'name': name,
+                'type': 'folder',
+                'children': []
+            }
+            self.current_parent['children'].append(new_item)
+            self.stack.append(new_item)
+            self.current_parent = new_item
 
-        if not self.stack:  # Если стек пуст, выходим
-            return
-
-        # Получаем все строковые токены
-        strings = [s.getText()[1:-1] for s in ctx.STRING()]
-        name = strings[0] if strings else ""  # Имя из первого токена
-        content = strings[4] if len(strings) > 4 else ""  # Контент из пятого токена
-
-        self.stack[-1]['children'].append({
-            'name': name,
-            'type': 'template',
-            'content': content
+        elif ctx.templateHeader():
+            # Обработка шаблона
+            header = ctx.templateHeader()
+            name = header.STRING(0).getText()[1:-1]
+            content = header.STRING(1).getText()[1:-1] if len(header.STRING()) > 1 else ""
+            self.current_parent['children'].append({
+                'name': name,
+                'type': 'template',
+                'content': content
             })
 
-    def enterFolderHeader(self, ctx):
-        """Обработка входа в папку"""
-        name = ctx.STRING(0).getText()[1:-1]  # Получаем имя папки (первый STRING)
-
-        # Если это первая папка, сохраняем её имя
-        if not self.found_first_folder:
-            self.root_name = name
-            self.found_first_folder = True
-            return  # Выходим, не добавляя в структуру
-
-        new_item = {
-            'name': name,
-            'type': 'folder',
-            'children': []
-        }
-        self.stack[-1]['children'].append(new_item)
-        self.stack.append(new_item)
-
-    def exitFolderHeader(self, ctx):
-        """Выход из папки"""
-        if len(self.stack) > 1:
+    def exitEntry(self, ctx):
+        if ctx.folderHeader() and len(self.stack) > 1:
             self.stack.pop()
-
+            self.current_parent = self.stack[-1]
 
 # ===================================================================
 # ГРАФИЧЕСКИЙ ИНТЕРФЕЙС
