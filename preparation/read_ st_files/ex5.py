@@ -247,6 +247,8 @@ class STFileParserWrapper:
 
         tree = parser.fileStructure()
         listener = StructureListener()
+        file_name = os.path.splitext(os.path.basename(file_path))[0]
+        listener.root_name = file_name  # ИЗМЕНЕНИЕ: Имя файла в listener
         ParseTreeWalker().walk(listener, tree)
 
         return {
@@ -265,6 +267,7 @@ class StructureListener(STFileListener):
         self.current_parent = self.stack[0]
         self.root_name = "Unnamed"
         self.found_root = False
+
 
     def get_structure(self):
         return self.stack[0]['children']
@@ -296,11 +299,14 @@ class StructureListener(STFileListener):
                                 self.found_root = True
                                 break'''
 
+
+
     def enterEntry(self, ctx):
         if ctx.folderHeader():
             # Обработка папки
             header = ctx.folderHeader()
             name = header.STRING(0).getText()[1:-1]
+
             new_item = {
                 'name': name,
                 'type': 'folder',
@@ -316,7 +322,7 @@ class StructureListener(STFileListener):
             # Обработка шаблона
             header = ctx.templateHeader()
             name = header.STRING(0).getText()[1:-1]
-            content = header.STRING(1).getText()[1:-1] if len(header.STRING()) > 1 else ""
+            content = header.STRING(2).getText()[1:-1] if len(header.STRING()) > 1 else ""
             self.current_parent['children'].append({
                 'name': name,
                 'type': 'template',
@@ -365,7 +371,7 @@ class TreeItemDelegate(QStyledItemDelegate):
 
         # Обрабатываем клик
         if event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
-            if button_rect.contains(event.pos()):
+            if button_rect.contains(event.position().toPoint()):
                 if self.tree_view.isExpanded(index):
                     self.tree_view.collapse(index)
                 else:
