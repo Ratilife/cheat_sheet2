@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QSplitter, QTreeView, QTextEdit, QWidget,
                                QFileIconProvider, QStyledItemDelegate, QStyleOptionButton, QStyle)
 from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject, QRect, QSize,
                             QAbstractItemModel, QModelIndex, QEvent)
-from PySide6.QtGui import QAction, QIcon, QFont, QColor, QCursor
+from PySide6.QtGui import QAction, QIcon, QFont, QColor, QCursor, QPen, QPainter
 
 # Импорт компонентов ANTLR
 from antlr4 import FileStream, CommonTokenStream, ParseTreeWalker
@@ -461,6 +461,17 @@ class SidePanel(QWidget):
         # Загружаем сохраненные файлы при старте
         self._load_saved_files()
 
+        # Для изменения размеров
+        self.resize_area = 5  # Ширина области захвата для изменения размеров
+        self.resize_direction = None
+        self.drag_start_position = None
+        self.drag_window_position = None
+        self.drag_window_size = None
+
+        # Гарантируем, что окно будет видимым
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.show()
+
     # Метод инициализации пользовательского интерфейса
     def _init_ui(self):
         # Устанавливаем минимальную ширину панели
@@ -725,25 +736,55 @@ class SidePanel(QWidget):
 
     # Обработчик нажатия кнопки мыши (для перемещения окна)
     def mousePressEvent(self, event):
-        # Если нажата левая кнопка мыши в области заголовка (верхние 30 пикселей)
-        if event.button() == Qt.LeftButton and event.position().y() < 30:
-            # Запоминаем начальную позицию курсора
-            self.drag_start_position = event.globalPosition().toPoint()
-            # Запоминаем текущую позицию окна
-            self.drag_window_position = self.pos()
-            # Принимаем событие
-            event.accept()
+        if event.button() == Qt.LeftButton:
+            if self.dock_position == "float":
+                # Проверяем, находится ли курсор в области изменения размеров
+                rect = self.rect()
+                self.resize_direction = self._get_resize_direction(event.position().toPoint(), rect)
+
+                if self.resize_direction:
+                    # Начинаем изменение размера
+                    self.drag_start_position = event.globalPosition().toPoint()
+                    self.drag_window_position = self.pos()
+                    self.drag_window_size = self.size()
+                    event.accept()
+                    return
+
+            # Обычное перемещение окна
+            if event.position().y() < 30:  # Только в заголовке
+                self.drag_start_position = event.globalPosition().toPoint()
+                self.drag_window_position = self.pos()
+                event.accept()
 
     # Обработчик перемещения мыши (для перемещения окна)
     def mouseMoveEvent(self, event):
-        # Если начата операция перетаскивания
-        if hasattr(self, 'drag_start_position'):
-            # Вычисляем смещение курсора
-            delta = event.globalPosition().toPoint() - self.drag_start_position
-            # Перемещаем окно на вычисленное смещение
-            self.move(self.drag_window_position + delta)
-            # Принимаем событие
-            event.accept()
+        if self.dock_position == "float" and hasattr(self, 'drag_start_position'):
+            if self.resize_direction:
+                # Изменение размера окна
+                delta = event.globalPosition().toPoint() - self.drag_start_position
+                new_rect = QRect(self.drag_window_position, self.drag_window_size)
+
+                if "left" in self.resize_direction:
+                    new_rect.setLeft(new_rect.left() + delta.x())
+                if "right" in self.resize_direction:
+                    new_rect.setRight(new_rect.right() + delta.x())
+                if "top" in self.resize_direction:
+                    new_rect.setTop(new_rect.top() + delta.y())
+                if "bottom" in self.resize_direction:
+                    new_rect.setBottom(new_rect.bottom() + delta.y())
+
+                # Применяем новые размеры и позицию
+                if new_rect.width() > self.minimumWidth() and new_rect.height() > self.minimumHeight():
+                    self.setGeometry(new_rect)
+                event.accept()
+            # Если начата операция перетаскивания
+            elif hasattr(self, 'drag_start_position'):
+                # Вычисляем смещение курсора
+                delta = event.globalPosition().toPoint() - self.drag_start_position
+                # Перемещаем окно на вычисленное смещение
+                self.move(self.drag_window_position + delta)
+                # Принимаем событие
+                event.accept()
 
     # Обработчик отпускания кнопки мыши (завершение перемещения)
     def mouseReleaseEvent(self, event):
@@ -751,6 +792,7 @@ class SidePanel(QWidget):
         if hasattr(self, 'drag_start_position'):
             # Удаляем временные данные
             del self.drag_start_position
+            self.resize_direction = None
             # Принимаем событие
             event.accept()
 
@@ -774,6 +816,28 @@ class SidePanel(QWidget):
                 self.file_watcher.removePaths(self.file_watcher.files())
             # Добавляем новый файл в наблюдатель
             self.file_watcher.addPath(file_path)'''
+
+    def _get_resize_direction(self, pos, rect):
+        """Определяет направление изменения размера"""
+        directions = []
+        if pos.x() <= self.resize_area:
+            directions.append("left")
+        elif pos.x() >= rect.width() - self.resize_area:
+            directions.append("right")
+        if pos.y() <= self.resize_area:
+            directions.append("top")
+        elif pos.y() >= rect.height() - self.resize_area:
+            directions.append("bottom")
+
+        return "_".join(directions) if directions else None
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.dock_position == "float":
+            # Подсветка границ для визуального обозначения области изменения размеров
+            painter = QPainter(self)
+            painter.setPen(QPen(QColor(100, 100, 100, 100), self.resize_area))
+            painter.drawRect(self.rect())
 
     # Обработчик изменения файла
     def _on_file_changed(self, path):
@@ -916,6 +980,8 @@ class SidePanel(QWidget):
                 300,  # Ширина
                 screen.height()  # Высота
             ))
+            self.setFixedWidth(300)  # Фиксируем ширину в закрепленном режиме
+            self.setFixedHeight(screen.height())  # Фиксируем высоту
         # Если панель должна быть справа
         elif self.dock_position == "right":
             self.setGeometry(QRect(
@@ -924,6 +990,13 @@ class SidePanel(QWidget):
                 300,  # Ширина
                 screen.height()  # Высота
             ))
+            self.setFixedWidth(300)  # Фиксируем ширину в закрепленном режиме
+            self.setFixedHeight(screen.height())  # Фиксируем высоту
+        # Для режима float не устанавливаем фиксированные размеры
+        elif self.dock_position == "float":
+            self.setMinimumSize(200, 200)
+            self.setMaximumSize(16777215, 16777215)
+            self.setFixedSize(QSize())  # Снимаем фиксированные размеры
 
     # Метод инициализации контекстного меню
     def _init_position_menu(self):
@@ -967,6 +1040,15 @@ class SidePanel(QWidget):
     # Метод для включения свободного перемещения
     def _enable_floating(self):
         self.dock_position = "float"
+        #self.update_dock_position()  # Обновляем геометрию
+        # Устанавливаем начальные размеры и позицию
+        screen = QApplication.primaryScreen().availableGeometry()
+        self.setGeometry(QRect(
+            screen.right() - 350,  # X координата (немного левее правого края)
+            screen.top() + 100,  # Y координата (немного ниже верхнего края)
+            300,  # Ширина
+            screen.height() - 200  # Высота (меньше высоты экрана)
+        ))
         self._update_menu_checks()
 
     # Метод обновления состояния пунктов меню
