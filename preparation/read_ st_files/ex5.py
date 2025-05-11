@@ -360,36 +360,6 @@ class TreeItemDelegate(QStyledItemDelegate):
         return size
 
     # неактуально. Возможно вдальнейшем удаление. Неспользуется
-    '''def paint_old(self, painter, option, index):
-
-        #1. Подготовка данных:
-        # Получаем тип элемента и уровень вложенности из модели
-        item_type = index.data(Qt.UserRole + 2)   # Получаем тип элемента
-        level = index.data(Qt.UserRole + 1)       # Получаем уровень вложенности
-
-        # Сохраняем оригинальные параметры отрисовки
-        original_padding = option.rect.left()
-
-        #2. Настройка отступов:
-        # Увеличиваем отступ в зависимости от уровня вложенности
-        if level is not None and level > 0:
-            indent = level * 15  # 15 пикселей на каждый уровень вложенности
-            option.rect.adjust(indent, 0, 0, 0)  # Сдвигаем только левую границу
-
-        #3. Дополнительная обработка шаблонов:
-        # Устанавливаем разные стили для разных типов элементов
-        if item_type == "template":
-            # Дополнительный отступ для шаблонов
-            option.rect.adjust(15, 0, 0, 0)  # Ещё +15px для шаблонов
-
-        #4. Базовая отрисовка:
-        # Вызываем оригинальный метод paint
-        super().paint(painter, option, index)   # Стандартная отрисовка
-
-        #5. Восстановление состояния:
-        # Восстанавливаем оригинальные параметры
-        option.rect.adjust(-option.rect.left() + original_padding, 0, 0, 0) # Возвращаем прямоугольник в исходное положение
-        '''
 
     def paint(self, painter, option, index):
         item = index.internalPointer()
@@ -562,47 +532,17 @@ class SidePanel(QWidget):
         # self.tree_view.setItemDelegate(TreeItemDelegate(self.tree_view))
         # Настройка стиля дерева
         self.tree_view.setStyleSheet("""
-                                     QTreeView {
-                                     background-color: white;
-                                     border: 1px solid #ddd;
-                                     }
-                                     QTreeView::item {
-                                     padding: 4px;
-                                     }
-                                     """)
-        '''self.tree_view.setStyleSheet("""
-            QTreeView {
-                background-color: #f5f5f5;
-                border: none;
-                outline: 0;
-                font-size: 12px;
-            }
-            QTreeView::item {
-                padding: 4px 1px;
-                border: none;
-                height: 24px;
-            }
-            QTreeView::item:selected {
-                background-color: #d4d4d4;
-                color: black;
-            }
-            QTreeView::item:hover {
-                background-color: #e0e0e0;
-            }
-            /* Удалите или закомментируйте эти правила, чтобы показать стандартные индикаторы */
-            /*
-            QTreeView::branch:has-children:!has-siblings:closed,
-            QTreeView::branch:closed:has-children:has-siblings {
-                border-image: none;
-                image: none;
-            }
-            QTreeView::branch:open:has-children:!has-siblings,
-            QTreeView::branch:open:has-children:has-siblings {
-                border-image: none;
-                image: none;
-            }
-            */
-        """)'''
+                                QTreeView {
+                                background-color: white;
+                                border: 1px solid #ddd;
+                            }
+                                QTreeView::item {
+                                padding: 2px;  # Уменьшенный padding
+                                margin: 0px;   # Убраны margins
+                                height: 20px;  # Уменьшенная высота строки
+                            }
+                                """)
+
         # Подключаем обработчик клика по элементам дерева
         self.tree_view.clicked.connect(self._on_tree_item_clicked)
 
