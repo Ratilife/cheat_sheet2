@@ -143,6 +143,7 @@ class STFileTreeModel(QAbstractItemModel):
 
         print("Parsed structure:")
         print(json.dumps(result['structure'], indent=2, ensure_ascii=False))
+        print(f"Root name: {result['root_name']}")  # Отладочный вывод
 
         # Извлекаем имя корневой папки (например, "Новый1")
         root_name = result['root_name']
@@ -155,6 +156,7 @@ class STFileTreeModel(QAbstractItemModel):
 
         # Создаем элемент для корневой папки с именем из файла
         file_item = STFileTreeItem([root_name, "file", file_path], self.root_item)
+
 
         # Строим поддерево на основе структуры файла
         self._build_tree(structure, file_item)
@@ -267,17 +269,32 @@ class StructureListener(STFileListener):
     def get_structure(self):
         return self.stack[0]['children']
 
-    def enterFileStructure(self, ctx):
+    '''def enterFileStructure(self, ctx):
+        """
+        Обрабатывает вход в корневую структуру ST-файла.
+
+        Этот метод вызывается при входе в корневой элемент файла. Он ищет первый
+        элемент folderHeader, чтобы определить имя корневой папки.
+
+        Args:
+            ctx: Контекст парсера для корневой структуры файла
+        """
         # Обработка корневого уровня файла
         if not self.found_root:
-            # Ищем первое вхождение folderHeader для имени корня
-            for child in ctx.getChildren():
-                if hasattr(child, 'folderHeader'):
-                    folder_ctx = child.folderHeader()
-                    if folder_ctx:
-                        self.root_name = folder_ctx.STRING(0).getText()[1:-1]
-                        self.found_root = True
-                        break
+            # Ищем первый folderHeader для определения имени корня
+            # ИЗМЕНЕНИЕ: Более надежная проверка структуры контекста
+            if hasattr(ctx, 'children') and ctx.children:
+                for child in ctx.children:
+                    # ИЗМЕНЕНИЕ: Добавлена проверка на наличие entry
+                    if hasattr(child, 'entry') and child.entry():
+                        entry = child.entry()
+                        # ИЗМЕНЕНИЕ: Проверяем folderHeader через entry
+                        if hasattr(entry, 'folderHeader') and entry.folderHeader():
+                            folder_ctx = entry.folderHeader()
+                            if folder_ctx and folder_ctx.STRING():
+                                self.root_name = folder_ctx.STRING(0).getText()[1:-1]
+                                self.found_root = True
+                                break'''
 
     def enterEntry(self, ctx):
         if ctx.folderHeader():
@@ -292,6 +309,8 @@ class StructureListener(STFileListener):
             self.current_parent['children'].append(new_item)
             self.stack.append(new_item)
             self.current_parent = new_item
+
+
 
         elif ctx.templateHeader():
             # Обработка шаблона
@@ -336,10 +355,10 @@ class TreeItemDelegate(QStyledItemDelegate):
             return super().editorEvent(event, model, option, index)
 
         # Рассчитываем позицию кнопки с учетом уровня вложенности
-        indent = (level - 1) * self.tree_view.indentation()
+        #indent = (level - 1) * self.tree_view.indentation()
         button_rect = QRect(
-            option.rect.left() + indent,  # Учитываем отступ
-            option.rect.top() + self.fixed_indent,  # <-- Используем фиксированный отступ,
+            option.rect.left() + self.fixed_indent,  # <-- Используем фиксированный отступ,
+            option.rect.top() ,
             self.button_size,
             option.rect.height()
         )
@@ -535,16 +554,43 @@ class SidePanel(QWidget):
         # self.tree_view.setItemDelegate(TreeItemDelegate(self.tree_view))
         # Настройка стиля дерева
         self.tree_view.setStyleSheet("""
-                                QTreeView {
-                                background-color: white;
-                                border: 1px solid #ddd;
-                            }
-                                QTreeView::item {
-                                padding: 2px;  # Уменьшенный padding
-                                margin: 0px;   # Убраны margins
-                                height: 20px;  # Уменьшенная высота строки
-                            }
-                                """)
+            QTreeView {
+                background-color: white;
+                border: 1px solid #ddd;
+            }
+            QTreeView::item {
+                padding: 2px;
+                margin: 0px;
+                height: 20px;
+            }
+            /* Убираем стандартные треугольники */
+            QTreeView::branch {
+                background: transparent;
+                border: 0px;
+            }
+            QTreeView::branch:has-siblings:!adjoins-item {
+                border-image: none;
+                image: none;
+            }
+            QTreeView::branch:has-siblings:adjoins-item {
+                border-image: none;
+                image: none;
+            }
+            QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+                border-image: none;
+                image: none;
+            }
+            QTreeView::branch:has-children:!has-siblings:closed,
+            QTreeView::branch:closed:has-children:has-siblings {
+                border-image: none;
+                image: none;
+            }
+            QTreeView::branch:open:has-children:!has-siblings,
+            QTreeView::branch:open:has-children:has-siblings {
+                border-image: none;
+                image: none;
+            }
+        """)
 
         # Подключаем обработчик клика по элементам дерева
         self.tree_view.clicked.connect(self._on_tree_item_clicked)
