@@ -321,6 +321,9 @@ class TreeItemDelegate(QStyledItemDelegate):
         # Добавляем иконки для кнопок
         self.expand_icon = QIcon.fromTheme("list-add")
         self.collapse_icon = QIcon.fromTheme("list-remove")
+        self.button_size = 15
+        self.fixed_indent = 20  # <-- Добавляем фиксированный отступ для кнопки
+
 
     def editorEvent(self, event, model, option, index):
         item = index.internalPointer()
@@ -336,8 +339,8 @@ class TreeItemDelegate(QStyledItemDelegate):
         indent = (level - 1) * self.tree_view.indentation()
         button_rect = QRect(
             option.rect.left() + indent,  # Учитываем отступ
-            option.rect.top(),
-            22,
+            option.rect.top() + self.fixed_indent,  # <-- Используем фиксированный отступ,
+            self.button_size,
             option.rect.height()
         )
 
@@ -368,7 +371,7 @@ class TreeItemDelegate(QStyledItemDelegate):
 
         original_rect = option.rect
         level = index.data(Qt.UserRole + 1) or 0
-        base_indent = (level - 1) * self.tree_view.indentation() if level > 0 else 0
+        base_indent = (level - 1) * self.tree_view.indentation() if level > 0 else 0 # ?
 
         # Сдвигаем все элементы согласно уровню
         option.rect = original_rect.adjusted(base_indent, 0, 0, 0)
@@ -376,9 +379,9 @@ class TreeItemDelegate(QStyledItemDelegate):
         # Рисуем кнопку только для папок (кроме корневого уровня)
         if item.type == "folder" and item.child_items and level > 0:
             button_rect = QRect(
-                original_rect.left() + base_indent,
-                original_rect.top(),
-                22,
+                original_rect.left() + self.fixed_indent,
+                original_rect.top()+ (original_rect.height() - self.button_size) // 2,  # Центрируем по вертикали
+                self.button_size,
                 original_rect.height()
             )
 
@@ -386,10 +389,10 @@ class TreeItemDelegate(QStyledItemDelegate):
             button_option.rect = button_rect
             button_option.state = QStyle.State_Enabled
             button_option.icon = self.collapse_icon if self.tree_view.isExpanded(index) else self.expand_icon
-            button_option.iconSize = QSize(12, 12)
+            button_option.iconSize = QSize(10, 10)
 
             QApplication.style().drawControl(QStyle.CE_PushButton, button_option, painter)
-            option.rect.adjust(22, 0, 0, 0)  # Сдвигаем текст после кнопки
+            option.rect.adjust(self.fixed_indent + self.button_size + 4, 0, 0, 0)  # Сдвигаем текст после кнопки
 
         # Дополнительный отступ для шаблонов
         if item.type == "template":
