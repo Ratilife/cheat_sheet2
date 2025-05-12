@@ -199,7 +199,7 @@ class STFileTreeModel(QAbstractItemModel):
         file_item = STFileTreeItem([result['root_name'], "markdown", file_path], self.root_item)
 
         # Строим структуру (для MD будет только один корневой элемент)
-        self._build_tree(result['structure'], file_item)
+        #self._build_tree(result['structure'], file_item)
 
         self.root_item.child_items.append(file_item)
         self.endInsertRows()
