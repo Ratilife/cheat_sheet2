@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QModelIndex, Signal
 from PySide6.QtGui import QAction, QIcon
 from delegates import TreeItemDelegate
 
-
+#TODO определится нужен класс MarkdownEditor
 class MarkdownEditor(QWidget):
     """Класс для редактирования MD файлов с поддержкой Markdown"""
 
@@ -70,6 +70,88 @@ class MarkdownEditor(QWidget):
         """Получить содержимое редактора"""
         return self.text_editor.toPlainText()
 
+
+class MarkdownViewer(QWidget):
+    """Класс для отображения MD файлов в двух режимах: текст и markdown"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self._init_ui()
+        self._current_mode = 'text'  # 'text' или 'markdown'
+
+    def _init_ui(self):
+        """Инициализация интерфейса просмотрщика MD"""
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+
+        # Панель переключения режимов
+        self.mode_panel = QWidget()
+        mode_layout = QHBoxLayout(self.mode_panel)
+        mode_layout.setSpacing(5)
+
+        # Группа переключателей
+        self.mode_group = QButtonGroup(self)
+
+        # Кнопки режимов
+        self.text_mode_btn = QRadioButton("Текст")
+        self.text_mode_btn.setChecked(True)
+        self.markdown_mode_btn = QRadioButton("Markdown")
+
+        self.mode_group.addButton(self.text_mode_btn)
+        self.mode_group.addButton(self.markdown_mode_btn)
+        self.mode_group.buttonClicked.connect(self._change_mode)
+
+        mode_layout.addWidget(self.text_mode_btn)
+        mode_layout.addWidget(self.markdown_mode_btn)
+        mode_layout.addStretch()
+
+        # Редакторы
+        self.text_editor = QTextEdit()
+        self.text_editor.setAcceptRichText(False)
+
+        self.markdown_editor = QTextEdit()
+        self.markdown_editor.setReadOnly(True)
+        self.markdown_editor.setVisible(False)
+
+        self.layout.addWidget(self.mode_panel)
+        self.layout.addWidget(self.text_editor)
+        self.layout.addWidget(self.markdown_editor)
+
+    def _change_mode(self):
+        """Переключение между режимами просмотра"""
+        if self.text_mode_btn.isChecked():
+            self._current_mode = 'text'
+            self.markdown_editor.setVisible(False)
+            self.text_editor.setVisible(True)
+        else:
+            self._current_mode = 'markdown'
+            # Конвертируем текст в HTML для отображения markdown
+            html = self._convert_md_to_html(self.text_editor.toPlainText())
+            self.markdown_editor.setHtml(html)
+            self.text_editor.setVisible(False)
+            self.markdown_editor.setVisible(True)
+
+    def _convert_md_to_html(self, md_text):
+        """Простая конвертация Markdown в HTML (можно заменить на более продвинутую)"""
+        # Базовая конвертация - в реальном приложении лучше использовать библиотеку
+        html = md_text
+        html = html.replace('**', '<b>').replace('**', '</b>')
+        html = html.replace('*', '<i>').replace('*', '</i>')
+        html = html.replace('## ', '<h2>').replace('\n', '</h2>\n')
+        return html
+
+    def set_content(self, text):
+        """Установка содержимого редактора"""
+        self.text_editor.setPlainText(text)
+        if self._current_mode == 'markdown':
+            html = self._convert_md_to_html(text)
+            self.markdown_editor.setHtml(html)
+
+    def get_content(self):
+        """Получение содержимого редактора"""
+        return self.text_editor.toPlainText()
+
 class FileEditorWindow(QMainWindow):
     """
         Главное окно редактора файлов с поддержкой форматов .st и .md.
@@ -92,9 +174,12 @@ class FileEditorWindow(QMainWindow):
         self.setMinimumSize(600, 500)  # Минимальные размеры окна
         self.current_file_path = None  # Путь к текущему открытому файлу
 
+        self.md_viewer = None  # атрибут для MD просмотрщика
+
         self._init_ui()  # Инициализация интерфейса
         self.current_structure = None  # Для хранения структуры ST файла
         self.center_window()  # Добавляем центрирование после инициализации UI
+        self._reset_editors()
 
     def center_window(self):
         """Центрирует окно на экране"""
@@ -237,8 +322,11 @@ class FileEditorWindow(QMainWindow):
         button_layout.addWidget(self.paste_btn)
 
         # Текстовый редактор
-        self.text_editor = QTextEdit()             # Основной текстовый редактор
+        self.text_editor = QTextEdit()             # Основной текстовый редактор для ST файлов
         self.text_editor.setAcceptRichText(False)  # Режим plain text  Отключаем форматированный текст
+
+        self.md_viewer = MarkdownViewer()  # Создаем просмотрщик MD
+        self.md_viewer.setVisible(False)  # По умолчанию скрыт
 
         # Контейнер для редактора и кнопок
         editor_container = QWidget()                     # Контейнерный виджет
@@ -249,6 +337,7 @@ class FileEditorWindow(QMainWindow):
         # Добавляем кнопки над редактором
         editor_layout.addWidget(button_panel)
         editor_layout.addWidget(self.text_editor)
+        editor_layout.addWidget(self.md_viewer)  #MD просмотрщик
 
         # Добавляем виджеты в разделитель
         self.splitter.addWidget(self.tree_view)          # Дерево файлов сверху
@@ -401,6 +490,9 @@ class FileEditorWindow(QMainWindow):
     def _load_file_content(self, file_path):
         """Загрузка содержимого файла в соответствующий редактор"""
         try:
+            # Сначала сбрасываем состояние редакторов
+            self._reset_editors()  # <-- НОВАЯ СТРОКА
+
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
 
@@ -410,7 +502,7 @@ class FileEditorWindow(QMainWindow):
                 # ST файл - используем text_editor
                 self.current_structure = self._parse_st_file(content)
                 self.text_editor.setPlainText(content)
-                self._update_st_display()
+                #self._update_st_display() почему убрали?
 
                 # Настройка интерфейса для ST файлов
                 self.btn_new_folder.setEnabled(True)
@@ -418,41 +510,29 @@ class FileEditorWindow(QMainWindow):
                 self.text_mode_btn.setEnabled(True)
                 self.markdown_mode_btn.setEnabled(True)
 
+                # Показываем нужные редакторы
+                self.text_editor.show()              # <-- Гарантированно показываем text_editor
+                self.md_viewer.hide()
+                #self.text_mode_btn.setChecked(True)  #  сброс режима просмотра
             else:
-                # MD файл - используем md_editor
-                self.md_editor.set_content(content)
-                self.text_editor.hide()
-                self.md_editor.show()
+                # MD файл - используем md_viewer
+                self.md_viewer.set_content(content)
+
 
                 # Настройка интерфейса для MD файлов
                 self.btn_new_folder.setEnabled(False)
                 self.btn_new_template.setEnabled(False)
                 self.text_mode_btn.setEnabled(False)
                 self.markdown_mode_btn.setEnabled(False)
+                #self.text_mode_btn.setChecked(True)  #  сброс режима просмотра
+
+                self.text_editor.hide()
+                self.md_viewer.show()
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить файл: {str(e)}")
-
-    #TODO пересматреть формироване метода _save_file
+            self._reset_editors()  # <-- НОВАЯ СТРОКА ДЛЯ ОБРАБОТКИ ОШИБОК
     def _save_file(self):
-        """Сохранение текущего файла"""
-        if not self.current_file_path:
-            self._save_file_as()  # Если файл новый - вызываем "Сохранить как"
-            return
-            
-        try:
-            with open(self.current_file_path, 'w', encoding='utf-8') as f:
-                if self.current_file_path.endswith('.md'):
-                    f.write(self.text_editor.toMarkdown())  # Сохраняем Markdown
-                else:
-                    f.write(self.text_editor.toPlainText())  # Сохраняем обычный текст
-                    
-            QMessageBox.information(self, "Сохранено", "Файл успешно сохранен")
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл: {str(e)}")
-
-    def _save_file_Варант_для_выбора(self):
         """Сохранение текущего файла."""
         if not self.current_file_path:
             self._save_file_as()
@@ -461,7 +541,7 @@ class FileEditorWindow(QMainWindow):
         try:
             with open(self.current_file_path, 'w', encoding='utf-8') as f:
                 if self.current_file_path.endswith('.md'):
-                    f.write(self.md_editor.get_content())
+                    f.write(self.md_viewer.get_content())  # Получаем содержимое из MD просмотрщика
                 else:
                     f.write(self.text_editor.toPlainText())
 
@@ -581,7 +661,7 @@ class FileEditorWindow(QMainWindow):
                     self.parent_panel.remove_file(self.current_file_path)
                     
                 self.current_file_path = None
-                self.text_editor.clear()  # Очищаем редактор
+                self._reset_editors()   # Очищаем редактор
                 
                 QMessageBox.information(self, "Удалено", "Файл успешно удален")
                 
@@ -853,10 +933,19 @@ class FileEditorWindow(QMainWindow):
         if self.markdown_mode_btn.isChecked():
             # Переключаемся в режим Markdown
             md_content = self._convert_st_to_markdown(self.text_editor.toPlainText())
-            self.md_editor.set_content(md_content)
+            self.md_viewer.set_content(md_content)
             self.text_editor.hide()
-            self.md_editor.show()
+            self.md_viewer.show()
         else:
             # Возвращаемся к обычному тексту
-            self.md_editor.hide()
-            self.text_editor.show()
+            self.text_editor.show()  # <-- Гарантированно показываем text_editor
+            self.md_viewer.hide()
+
+    def _reset_editors(self):
+        """Сбрасывает состояние всех редакторов"""
+        self.text_editor.clear()
+        self.md_viewer.set_content("")
+        self.text_editor.show()
+        self.md_viewer.hide()
+        self.text_mode_btn.setChecked(True)
+
