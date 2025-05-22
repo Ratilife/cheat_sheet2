@@ -3,9 +3,10 @@ import os
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QPushButton, QTextEdit, QTreeView, QFileDialog,
                                QMessageBox, QSplitter, QStyle, QInputDialog, QApplication, QButtonGroup, QRadioButton)
-from PySide6.QtCore import Qt, QModelIndex, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QIcon
 from delegates import TreeItemDelegate
+from md_file_parser import MarkdownViewer
 
 #TODO определится нужен класс MarkdownEditor
 class MarkdownEditor(QWidget):
@@ -70,87 +71,6 @@ class MarkdownEditor(QWidget):
         """Получить содержимое редактора"""
         return self.text_editor.toPlainText()
 
-
-class MarkdownViewer(QWidget):
-    """Класс для отображения MD файлов в двух режимах: текст и markdown"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.parent = parent
-        self._init_ui()
-        self._current_mode = 'text'  # 'text' или 'markdown'
-
-    def _init_ui(self):
-        """Инициализация интерфейса просмотрщика MD"""
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-
-        # Панель переключения режимов
-        self.mode_panel = QWidget()
-        mode_layout = QHBoxLayout(self.mode_panel)
-        mode_layout.setSpacing(5)
-
-        # Группа переключателей
-        self.mode_group = QButtonGroup(self)
-
-        # Кнопки режимов
-        self.text_mode_btn = QRadioButton("Текст")
-        self.text_mode_btn.setChecked(True)
-        self.markdown_mode_btn = QRadioButton("Markdown")
-
-        self.mode_group.addButton(self.text_mode_btn)
-        self.mode_group.addButton(self.markdown_mode_btn)
-        self.mode_group.buttonClicked.connect(self._change_mode)
-
-        mode_layout.addWidget(self.text_mode_btn)
-        mode_layout.addWidget(self.markdown_mode_btn)
-        mode_layout.addStretch()
-
-        # Редакторы
-        self.text_editor = QTextEdit()
-        self.text_editor.setAcceptRichText(False)
-
-        self.markdown_editor = QTextEdit()
-        self.markdown_editor.setReadOnly(True)
-        self.markdown_editor.setVisible(False)
-
-        self.layout.addWidget(self.mode_panel)
-        self.layout.addWidget(self.text_editor)
-        self.layout.addWidget(self.markdown_editor)
-
-    def _change_mode(self):
-        """Переключение между режимами просмотра"""
-        if self.text_mode_btn.isChecked():
-            self._current_mode = 'text'
-            self.markdown_editor.setVisible(False)
-            self.text_editor.setVisible(True)
-        else:
-            self._current_mode = 'markdown'
-            # Конвертируем текст в HTML для отображения markdown
-            html = self._convert_md_to_html(self.text_editor.toPlainText())
-            self.markdown_editor.setHtml(html)
-            self.text_editor.setVisible(False)
-            self.markdown_editor.setVisible(True)
-
-    def _convert_md_to_html(self, md_text):
-        """Простая конвертация Markdown в HTML (можно заменить на более продвинутую)"""
-        # Базовая конвертация - в реальном приложении лучше использовать библиотеку
-        html = md_text
-        html = html.replace('**', '<b>').replace('**', '</b>')
-        html = html.replace('*', '<i>').replace('*', '</i>')
-        html = html.replace('## ', '<h2>').replace('\n', '</h2>\n')
-        return html
-
-    def set_content(self, text):
-        """Установка содержимого редактора"""
-        self.text_editor.setPlainText(text)
-        if self._current_mode == 'markdown':
-            html = self._convert_md_to_html(text)
-            self.markdown_editor.setHtml(html)
-
-    def get_content(self):
-        """Получение содержимого редактора"""
-        return self.text_editor.toPlainText()
 
 class FileEditorWindow(QMainWindow):
     """
