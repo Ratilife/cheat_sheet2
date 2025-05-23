@@ -12,6 +12,7 @@ from PySide6.QtGui import QAction,  QColor, QCursor, QPen, QPainter
 from file_editor import FileEditorWindow
 from delegates import TreeItemDelegate
 from content_handler import STFileTreeModel
+from md_file_parser import MarkdownViewer
 
 # ===================================================================
 # ГРАФИЧЕСКИЙ ИНТЕРФЕЙС
@@ -33,10 +34,14 @@ class SidePanel(QWidget):
         # - Без рамки (FramelessWindowHint)
         # - Всегда поверх других окон (WindowStaysOnTopHint)
         super().__init__(parent, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+
+
         # Создаем экземпляр класса для сигналов
         self.signals = SidePanelSignals()
         self.file_watcher = QFileSystemWatcher()  # Инициализация наблюдателя
         self.file_watcher.fileChanged.connect(self._on_file_changed)  # Подключение сигнала
+        # Заменяем QTextEdit на MarkdownViewer
+        self.markdown_viewer = MarkdownViewer()
         # Инициализация пользовательского интерфейса
         self._init_ui()
         # Инициализация контекстного меню для управления позицией
@@ -213,9 +218,10 @@ class SidePanel(QWidget):
         self.tree_view.clicked.connect(self._on_tree_item_clicked)
 
         # Создаем текстовое поле для отображения содержимого файлов
-        self.content_view = QTextEdit()
+        #self.content_view = QTextEdit()
         # Делаем текстовое поле только для чтения
-        self.content_view.setReadOnly(True)
+        #self.content_view.setReadOnly(True)
+
 
         # Инициализация модели данных
         self.tree_model = STFileTreeModel()
@@ -224,7 +230,9 @@ class SidePanel(QWidget):
         # 1. Дерево файлов (верхняя часть)
         self.splitter.addWidget(self.tree_view)
         # 2. Текстовое поле (нижняя часть)
-        self.splitter.addWidget(self.content_view)
+        #self.splitter.addWidget(self.content_view)
+        self.splitter.addWidget(self.tree_view)
+        self.splitter.addWidget(self.markdown_viewer)
         # 3. Добавляем разделитель в основной layout
         main_layout.addWidget(self.splitter)
 
@@ -334,11 +342,30 @@ class SidePanel(QWidget):
             return
 
         # Очищаем предыдущее содержимое
-        self.content_view.clear()
+        #self.content_view.clear()
+
+        # Очищаем предыдущее содержимое
+        self.markdown_viewer.set_content("")  # используем метод MarkdownViewer
 
         # Обработка разных типов элементов
         if item.item_data[1] == 'template':
-            self.content_view.setPlainText(item.item_data[2])
+            #self.content_view.setPlainText(item.item_data[2])
+            self.markdown_viewer.set_content(item.item_data[2])
+            self.markdown_viewer.set_view_mode("text") # <-- Устанавливаем текстовый режим для шаблонов
+
+        elif item.item_data[1] == 'file':  # <-- Обработка ST файлов
+            file_path = item.item_data[2]
+            try:
+                if os.path.exists(file_path):
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        self.markdown_viewer.set_content(content)
+                        self.markdown_viewer.set_view_mode("text")  # <-- Устанавливаем текстовый режим для ST файлов
+                else:
+                    self.markdown_viewer.set_content(f"Файл не найден: {file_path}")
+            except Exception as e:
+                self.markdown_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
+
 
         elif item.item_data[1] == 'markdown':
             file_path = item.item_data[2]
@@ -346,11 +373,15 @@ class SidePanel(QWidget):
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                        self.content_view.setMarkdown(content)
+                        #self.content_view.setMarkdown(content)
+                        self.markdown_viewer.set_content(content)
+                        self.markdown_viewer.set_view_mode("markdown")  # <-- Устанавливаем markdown режим для MD файлов
                 else:
-                    self.content_view.setPlainText(f"Файл не найден: {file_path}")
+                    #self.content_view.setPlainText(f"Файл не найден: {file_path}")
+                    self.markdown_viewer.set_content(f"Файл не найден: {file_path}")
             except Exception as e:
-                self.content_view.setPlainText(f"Ошибка загрузки файла: {str(e)}")
+                #self.content_view.setPlainText(f"Ошибка загрузки файла: {str(e)}")
+                self.markdown_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
 
         # Для файлов добавляем в наблюдатель
         if item.item_data[1] in ['file', 'markdown']:
@@ -463,14 +494,16 @@ class SidePanel(QWidget):
         self.tree_view.expandAll()
 
     # Метод для установки текстового содержимого
-    def set_content(self, text):
+    '''def set_content(self, text):
         """Установка текстового содержимого"""
         self.content_view.setPlainText(text)
+    '''
 
     # Метод для установки Markdown содержимого
-    def set_markdown_content(self, markdown_text):
+    '''def set_markdown_content(self, markdown_text):
         """Установка Markdown содержимого"""
         self.content_view.setMarkdown(markdown_text)
+    '''
 
     # Метод для очистки панели
     def clear(self):
@@ -570,6 +603,8 @@ class SidePanel(QWidget):
         self.dock_position = "right"  # left/right/float
         # Отступ от края экрана
         self.dock_margin = 5
+
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowStaysOnTopHint) # <- ОТКЛЮЧАЕМ поверх всех окон
         # Обновляем позицию
         self.update_dock_position()
         # Устанавливаем прозрачность окна
@@ -639,15 +674,20 @@ class SidePanel(QWidget):
         self.update_dock_position()
         self._update_menu_checks()
 
+
     # Метод для закрепления панели справа
     def _dock_to_right(self):
         self.dock_position = "right"
         self.update_dock_position()
         self._update_menu_checks()
 
+
+
     # Метод для включения свободного перемещения
     def _enable_floating(self):
         self.dock_position = "float"
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)  # <- ВКЛЮЧАЕМ поверх окон
+        self.show()
         #self.update_dock_position()  # Обновляем геометрию
         # Устанавливаем начальные размеры и позицию
         screen = QApplication.primaryScreen().availableGeometry()

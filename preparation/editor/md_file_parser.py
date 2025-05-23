@@ -159,6 +159,21 @@ class MarkdownViewer(QWidget):
         """Получение содержимого редактора"""
         return self.text_editor.toPlainText()
 
+    def set_view_mode(self, mode):
+        """Устанавливает режим отображения: 'text' или 'markdown'"""
+        if mode not in ['text', 'markdown']:
+            return
+
+        self._current_mode = mode
+
+        # Обновляем состояние кнопок
+        if mode == 'text':
+            self.text_mode_btn.setChecked(True)
+        else:
+            self.markdown_mode_btn.setChecked(True)
+
+        # Вызываем _change_mode для обновления отображения
+        self._change_mode()
 
 class MarkdownHighlighter(QSyntaxHighlighter):  # <-- Новый класс для подсветки синтаксиса
     """Класс для подсветки синтаксиса Markdown в QTextDocument"""
