@@ -11,26 +11,32 @@ from ANTLR4.st_Files.STFileListener import STFileListener
 
 class STFileParserWrapper:
     def parse_st_file(self, file_path):
-        input_stream = FileStream(file_path, encoding="utf-8")
-        lexer = STFileLexer(input_stream)
-        tokens = CommonTokenStream(lexer)
-        parser = STFileParser(tokens)
+        try:
+            input_stream = FileStream(file_path, encoding="utf-8")
+            lexer = STFileLexer(input_stream)
+            tokens = CommonTokenStream(lexer)
+            parser = STFileParser(tokens)
 
-        # Устанавливаем обработчик ошибок
-        parser.removeErrorListeners()
-        parser.addErrorListener(ExceptionErrorListener())
+            # Устанавливаем обработчик ошибок
+            parser.removeErrorListeners()
+            parser.addErrorListener(ExceptionErrorListener())
 
-        tree = parser.fileStructure()
-        listener = StructureListener()
-        file_name = os.path.splitext(os.path.basename(file_path))[0]
-        listener.root_name = file_name  # ИЗМЕНЕНИЕ: Имя файла в listener
-        ParseTreeWalker().walk(listener, tree)
+            tree = parser.fileStructure()
+            listener = StructureListener()
+            file_name = os.path.splitext(os.path.basename(file_path))[0]
+            listener.root_name = file_name  # ИЗМЕНЕНИЕ: Имя файла в listener
+            ParseTreeWalker().walk(listener, tree)
 
-        return {
-            'structure': listener.get_structure(),
-            'root_name': listener.root_name
-        }
-
+            return {
+                'structure': listener.get_structure(),
+                'root_name': listener.root_name
+            }
+        except Exception as e:
+            # Возвращаем базовую структуру при ошибке парсинга
+            return {
+                'structure': [],
+                'root_name': os.path.splitext(os.path.basename(file_path))[0]
+            }
 
 class ExceptionErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):

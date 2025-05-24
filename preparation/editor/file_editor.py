@@ -101,6 +101,10 @@ class FileEditorWindow(QMainWindow):
         self.center_window()  # Добавляем центрирование после инициализации UI
         self._reset_editors()
 
+        # Подключаем сигналы (если нужно)
+        if parent:
+            self.file_created.connect(parent._on_file_created)
+
     def center_window(self):
         """Центрирует окно на экране"""
         frame_geometry = self.frameGeometry()  # Получаем геометрию окна с учетом рамок
@@ -643,6 +647,38 @@ class FileEditorWindow(QMainWindow):
             if not path.endswith('.st'):
                 path += '.st'
 
+            try:
+                # Создаем файл с корректной структурой
+                with open(path, 'w', encoding='utf-8') as f:
+                    # Базовая структура нового ST файла
+                    file_name = os.path.basename(path).replace('.st', '')
+                    content = f"""{{1, {{"{file_name}", 1, 0, "", ""}}, []}}"""
+                    f.write(content)
+
+                # Обновляем текущий файл
+                self.current_file_path = path
+                self._load_file_content(path)  # Загружаем содержимое файла
+
+                # Отправляем сигнал о создании файла
+                self.file_created.emit(path)
+
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось создать файл: {str(e)}")
+
+    #TODO определтся удалять или оставить
+    def _new_st_file_old(self):
+        """
+        Создание нового ST файла.
+        Открывает диалог сохранения файла и инициализирует базовую структуру.
+        """
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Создать ST файл", "", "ST Files (*.st)")
+
+        if path:
+            # Добавляем расширение, если его нет
+            if not path.endswith('.st'):
+                path += '.st'
+
             # Базовая структура нового ST файла
             default_structure = {
                 'type': 'file',
@@ -665,6 +701,12 @@ class FileEditorWindow(QMainWindow):
                 self.current_structure = default_structure
                 self._update_tree_view()
                 self.file_created.emit(path)  # Отправляем сигнал о создании файла
+
+                # Добавляем файл в дерево, если есть родительская панель
+                if self.parent_panel:
+                    self.parent_panel.tree_model.add_file(path)
+                    self.parent_panel._save_files_to_json()
+
 
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Не удалось создать файл: {str(e)}")
@@ -691,6 +733,11 @@ class FileEditorWindow(QMainWindow):
                 self.current_file_path = path
                 self._load_file_content(path)
                 self.file_created.emit(path)  # Отправляем сигнал о создании файла
+
+                # Добавляем файл в дерево, если есть родительская панель
+                if self.parent_panel:
+                    self.parent_panel.tree_model.add_markdown_file(path)
+                    self.parent_panel._save_files_to_json()
 
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Не удалось создать файл: {str(e)}")
@@ -806,8 +853,34 @@ class FileEditorWindow(QMainWindow):
         # TODO: Реализовать загрузку содержимого
         pass
 
-    # TODO: разобраться с этим методом нужен ли он _generate_st_content
     def _generate_st_content(self, structure):
+        """
+        Генерация содержимого ST файла согласно грамматике STFile.g4.
+        """
+
+        def build_folder(folder):
+            children = []
+            for child in folder.get('children', []):
+                if child['type'] == 'folder':
+                    children.append(
+                        f'{{1, {{"{child["name"]}", 1, 0, "", ""}}, [\n'
+                        f'{build_folder(child)}\n'
+                        ']}'
+                    )
+                elif child['type'] == 'template':
+                    children.append(
+                        f'{{0, {{"{child["name"]}", 0, 1, "", "{child["content"]}"}}}}'
+                    )
+            return ',\n'.join(children)
+
+        root_folder = structure['content']
+        return (
+            f'{{1, {{"{root_folder["name"]}", 1, 0, "", ""}}, [\n'
+            f'{build_folder(root_folder)}\n'
+            ']}'
+        )
+    # TODO: разобраться с этим методом нужен ли он _generate_st_content_old
+    def _generate_st_content_old(self, structure):
         """
         Генерация содержимого ST файла согласно грамматике STFile.g4.
 

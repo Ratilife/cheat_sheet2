@@ -3,7 +3,7 @@ import os
 import json
 from PySide6.QtWidgets import (QSplitter, QTreeView, QTextEdit, QWidget,
                                QVBoxLayout, QApplication, QMenu,
-                               QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog)
+                               QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog, QMessageBox)
 from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject, QRect, QSize,
                              QModelIndex)
 from PySide6.QtGui import QAction,  QColor, QCursor, QPen, QPainter
@@ -239,7 +239,6 @@ class SidePanel(QWidget):
         # Настраиваем контекстное меню для дерева
         self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree_view.customContextMenuRequested.connect(self._show_tree_context_menu)
-
 
 
     # Обработка сохраненя и загрузки файлов st
@@ -779,7 +778,23 @@ class SidePanel(QWidget):
         """Открыть окно редактора файла"""
         if not hasattr(self, 'editor_window'):
             self.editor_window = FileEditorWindow(self)
+            # Подключаем сигналы редактора к панели
+            self.editor_window.file_created.connect(self._on_file_created)
         self.editor_window.show()
+
+    def _on_file_created(self, file_path):
+        """Обработчик сигнала о создании файла"""
+        try:
+            if file_path.endswith('.st'):
+                self.tree_model.add_file(file_path)
+            elif file_path.endswith('.md'):
+                self.tree_model.add_markdown_file(file_path)
+            self._save_files_to_json()
+            self.tree_view.expandAll()
+        except Exception as e:
+            print(f"Ошибка при добавлении файла в дерево: {e}")
+            # Можно добавить QMessageBox для показа ошибки пользователю
+            QMessageBox.warning(self, "Ошибка", f"Не удалось добавить файл в дерево: {str(e)}")
 
 # ===================================================================
 # ЗАПУСК ПРИЛОЖЕНИЯ
