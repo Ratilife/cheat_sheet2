@@ -38,6 +38,50 @@ class STFileParserWrapper:
                 'root_name': os.path.splitext(os.path.basename(file_path))[0]
             }
 
+    # Добавляем методы в STFileParserWrapper:
+    def remove_template(self, file_path, template_name):
+        """Удаляет шаблон из ST файла."""
+        structure = self.parse_st_file(file_path)
+        if not structure:
+            raise ValueError(f"Не удалось прочитать файл {file_path}")
+
+        new_structure = self._remove_from_structure(
+            structure,
+            lambda x: not (x['type'] == 'template' and x['name'] == template_name)
+        )
+        self._save_structure(file_path, new_structure)
+
+    def remove_folder(self, file_path, folder_name):
+        """Удаляет папку из ST файла."""
+        structure = self.parse_st_file(file_path)
+        if not structure:
+            raise ValueError(f"Не удалось прочитать файл {file_path}")
+
+        new_structure = self._remove_from_structure(
+            structure,
+            lambda x: not (x['type'] == 'folder' and x['name'] == folder_name)
+        )
+        self._save_structure(file_path, new_structure)
+
+    def _remove_from_structure(self, structure, filter_fn):
+        """Рекурсивно фильтрует структуру."""
+        structure['structure'] = [
+            item for item in structure['structure']
+            if filter_fn(item)
+        ]
+        for item in structure['structure']:
+            if item['type'] == 'folder':
+                item['children'] = self._remove_from_structure(item, filter_fn)
+        return structure
+
+    def _save_structure(self, file_path, structure):
+        """Сохраняет измененную структуру."""
+        content = self._generate_st_content(structure)
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        except Exception as e:
+            raise IOError(f"Ошибка сохранения файла: {str(e)}")
 class ExceptionErrorListener(ErrorListener):
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
         raise Exception(f"Ошибка парсинга в строке {line}:{column} - {msg}")

@@ -947,3 +947,19 @@ class FileEditorWindow(QMainWindow):
     def _remove_item(self, index, delete_from_disk=False):
         if self.delete_manager.execute_removal(index, delete_from_disk):
             self._save_files_to_json()
+
+    def _delete_file(self):
+        if not self.current_file_path:
+            return
+
+        index = self._find_file_index(self.current_file_path)
+        if not index.isValid():
+            return
+
+        # Создаем диалог с вариантами
+        dialog = RemovalDialog(self, index)  # Нужно реализовать этот диалог
+        if dialog.exec():
+            delete_from_disk = dialog.delete_from_disk()
+            success, msg = self.delete_manager.execute_removal(index, delete_from_disk)
+            if success:
+                self._reset_editors()

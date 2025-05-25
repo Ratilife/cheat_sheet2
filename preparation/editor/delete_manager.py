@@ -1,5 +1,25 @@
-from PySide6.QtCore import Signal, QObject
-from typing import Optional, Tuple
+"""
+ PySide6.QtCore.Signal - механизм сигналов Qt для реализации событийной модели
+ PySide6.QtCore.QObject - базовый класс для всех объектов Qt, обеспечивает:
+   - работу с сигналами/слотами
+   - управление памятью (родитель-потомок)
+   - интеграцию с event-loop
+
+ typing.Optional - указание что значение может быть None или указанного типа
+ typing.Tuple - аннотация для кортежей с указанием типов элементов
+
+ logging - стандартная библиотека для логирования:
+   - запись сообщений разного уровня (DEBUG, INFO, WARNING, ERROR)
+   - настройка обработчиков вывода (консоль, файлы и др.)
+
+ os - работа с операционной системой:
+   - манипуляции с путями (os.path)
+   - работа с файловой системой
+   - доступ к переменным окружения
+"""
+
+from PySide6.QtCore import (Signal, QObject)
+from typing import Tuple
 import logging
 import os
 
