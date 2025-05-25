@@ -13,6 +13,9 @@ from file_editor import FileEditorWindow
 from delegates import TreeItemDelegate
 from content_handler import STFileTreeModel
 from md_file_parser import MarkdownViewer
+from delete_manager import DeleteManager
+from st_file_parser import  STFileParserWrapper
+
 
 # ===================================================================
 # ГРАФИЧЕСКИЙ ИНТЕРФЕЙС
@@ -34,7 +37,10 @@ class SidePanel(QWidget):
         # - Без рамки (FramelessWindowHint)
         # - Всегда поверх других окон (WindowStaysOnTopHint)
         super().__init__(parent, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-
+        # Инициализация модели данных
+        self.tree_model = STFileTreeModel()
+        self.delete_manager = DeleteManager(self.tree_model, STFileParserWrapper())
+        self.delete_manager.removal_complete.connect(self._handle_removal_result)
 
         # Создаем экземпляр класса для сигналов
         self.signals = SidePanelSignals()
@@ -223,8 +229,7 @@ class SidePanel(QWidget):
         #self.content_view.setReadOnly(True)
 
 
-        # Инициализация модели данных
-        self.tree_model = STFileTreeModel()
+       #Установка модели
         self.tree_view.setModel(self.tree_model)
         # Добавляем виджеты в разделитель:
         # 1. Дерево файлов (верхняя часть)
@@ -316,7 +321,13 @@ class SidePanel(QWidget):
         self.tree_model.add_markdown_file(file_path)
         print(f"Markdown file added: {file_path}")
 
-
+    def _handle_removal_result(self, success, message):
+        """Обработчик результата удаления."""
+        if success:
+            self._save_files_to_json()
+            QMessageBox.information(self, "Успех", message)
+        else:
+            QMessageBox.warning(self, "Ошибка", message)
 
     def _load_st_files(self):
         """Загрузка ST-файлов через диалог"""
@@ -536,7 +547,45 @@ class SidePanel(QWidget):
             self.content_view.clear()
             self.current_file = None
 
+    #TODO доработать работает некоректно
     def _show_tree_context_menu(self, pos):
+        """Метод отображения контекстного меню для дерева."""
+        index = self.tree_view.indexAt(pos)
+        if not index.isValid():
+            return
+
+        item = index.internalPointer()
+        menu = QMenu(self)
+
+        # Определяем тип элемента
+        item_type = item.item_data[1]
+
+        if item_type in ['file', 'markdown']:
+            # Для файлов создаем подменю с вариантами удаления
+            delete_menu = menu.addMenu("Удалить")
+
+            # Вариант 1: Удалить только из дерева
+            delete_from_tree = delete_menu.addAction("Удалить из дерева")
+            delete_from_tree.triggered.connect(
+                lambda: self.delete_manager.execute_removal(index, False)  # delete_from_disk=False
+            )
+
+            # Вариант 2: Удалить полностью (с диска)
+            delete_completely = delete_menu.addAction("Удалить полностью")
+            delete_completely.triggered.connect(
+                lambda: self.delete_manager.execute_removal(index, True)  # delete_from_disk=True
+            )
+        else:
+            # Для других элементов (папки, шаблоны) простое удаление
+            delete_action = menu.addAction("Удалить")
+            delete_action.triggered.connect(
+                lambda: self.delete_manager.execute_removal(index, False)
+                # Для не-файлов delete_from_disk не применяется
+            )
+
+        menu.exec(self.tree_view.viewport().mapToGlobal(pos))
+
+    def _show_tree_context_menu_old(self, pos):
         """Показывает контекстное меню для дерева файлов
             Args:
             pos: QPoint - позиция курсора мыши при вызове контекстного меню
@@ -557,7 +606,8 @@ class SidePanel(QWidget):
             # Действие для удаления файла
             remove_action = QAction("Удалить из списка", self)
             # Подключаем обработчик удаления файла
-            remove_action.triggered.connect(lambda: self.remove_file(item.item_data[2]))
+            remove_action.triggered.connect(
+                lambda: self.remove_file(item.item_data[2]))
             # Добавляем действие в меню
             menu.addAction(remove_action)
         # Если элемент является папкой
@@ -796,6 +846,9 @@ class SidePanel(QWidget):
             # Можно добавить QMessageBox для показа ошибки пользователю
             QMessageBox.warning(self, "Ошибка", f"Не удалось добавить файл в дерево: {str(e)}")
 
+    def _remove_item(self, index, delete_from_disk=False):
+        if self.delete_manager.execute_removal(index, delete_from_disk):
+            self._save_files_to_json()
 # ===================================================================
 # ЗАПУСК ПРИЛОЖЕНИЯ
 # ===================================================================

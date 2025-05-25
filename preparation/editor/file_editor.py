@@ -101,6 +101,8 @@ class FileEditorWindow(QMainWindow):
         self.center_window()  # Добавляем центрирование после инициализации UI
         self._reset_editors()
 
+        self.delete_manager = parent.delete_manager
+
         # Подключаем сигналы (если нужно)
         if parent:
             self.file_created.connect(parent._on_file_created)
@@ -942,3 +944,6 @@ class FileEditorWindow(QMainWindow):
         self.md_viewer.hide()
         self.text_mode_btn.setChecked(True)
 
+    def _remove_item(self, index, delete_from_disk=False):
+        if self.delete_manager.execute_removal(index, delete_from_disk):
+            self._save_files_to_json()
