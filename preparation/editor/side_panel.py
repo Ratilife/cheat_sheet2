@@ -17,6 +17,7 @@ from delete_manager import DeleteManager
 from st_file_parser import  STFileParserWrapper
 
 
+
 # ===================================================================
 # ГРАФИЧЕСКИЙ ИНТЕРФЕЙС
 # ===================================================================
@@ -47,7 +48,7 @@ class SidePanel(QWidget):
         self.file_watcher = QFileSystemWatcher()  # Инициализация наблюдателя
         self.file_watcher.fileChanged.connect(self._on_file_changed)  # Подключение сигнала
         # Заменяем QTextEdit на MarkdownViewer
-        self.markdown_viewer = MarkdownViewer()
+        self.content_viewer = MarkdownViewer()
         # Инициализация пользовательского интерфейса
         self._init_ui()
         # Инициализация контекстного меню для управления позицией
@@ -237,7 +238,7 @@ class SidePanel(QWidget):
         # 2. Текстовое поле (нижняя часть)
         #self.splitter.addWidget(self.content_view)
         self.splitter.addWidget(self.tree_view)
-        self.splitter.addWidget(self.markdown_viewer)
+        self.splitter.addWidget(self.content_viewer)
         # 3. Добавляем разделитель в основной layout
         main_layout.addWidget(self.splitter)
 
@@ -355,13 +356,13 @@ class SidePanel(QWidget):
         #self.content_view.clear()
 
         # Очищаем предыдущее содержимое
-        self.markdown_viewer.set_content("")  # используем метод MarkdownViewer
+        self.content_viewer.set_content("")  # используем метод MarkdownViewer
 
         # Обработка разных типов элементов
         if item.item_data[1] == 'template':
             #self.content_view.setPlainText(item.item_data[2])
-            self.markdown_viewer.set_content(item.item_data[2])
-            self.markdown_viewer.set_view_mode("text") # <-- Устанавливаем текстовый режим для шаблонов
+            self.content_viewer.set_content(item.item_data[2])
+            self.content_viewer.set_view_mode("text") # <-- Устанавливаем текстовый режим для шаблонов
 
         elif item.item_data[1] == 'file':  # <-- Обработка ST файлов
             file_path = item.item_data[2]
@@ -369,12 +370,12 @@ class SidePanel(QWidget):
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                        self.markdown_viewer.set_content(content)
-                        self.markdown_viewer.set_view_mode("text")  # <-- Устанавливаем текстовый режим для ST файлов
+                        self.content_viewer.set_content(content)
+                        self.content_viewer.set_view_mode("text")  # <-- Устанавливаем текстовый режим для ST файлов
                 else:
-                    self.markdown_viewer.set_content(f"Файл не найден: {file_path}")
+                    self.content_viewer.set_content(f"Файл не найден: {file_path}")
             except Exception as e:
-                self.markdown_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
+                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
 
 
         elif item.item_data[1] == 'markdown':
@@ -384,14 +385,14 @@ class SidePanel(QWidget):
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
                         #self.content_view.setMarkdown(content)
-                        self.markdown_viewer.set_content(content)
-                        self.markdown_viewer.set_view_mode("markdown")  # <-- Устанавливаем markdown режим для MD файлов
+                        self.content_viewer.set_content(content)
+                        self.content_viewer.set_view_mode("markdown")  # <-- Устанавливаем markdown режим для MD файлов
                 else:
                     #self.content_view.setPlainText(f"Файл не найден: {file_path}")
-                    self.markdown_viewer.set_content(f"Файл не найден: {file_path}")
+                    self.content_viewer.set_content(f"Файл не найден: {file_path}")
             except Exception as e:
                 #self.content_view.setPlainText(f"Ошибка загрузки файла: {str(e)}")
-                self.markdown_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
+                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
 
         # Для файлов добавляем в наблюдатель
         if item.item_data[1] in ['file', 'markdown']:
@@ -521,15 +522,49 @@ class SidePanel(QWidget):
         # Очищаем модель дерева
         self.tree_view.setModel(None)
         # Очищаем текстовое поле
-        self.content_view.clear()
+        # Очищаем просмотрщик содержимого
+        self._clear_viewer()
         # Если есть наблюдаемые файлы, очищаем список
         if self.file_watcher.files():
             self.file_watcher.removePaths(self.file_watcher.files())
         # Сбрасываем текущий файл
         self.current_file = None
 
+    #TODO - что это за метод определится нужен этот метод
+    def _clear_viewer(self):
+        """Очищает все просмотрщики содержимого"""
+        if hasattr(self, 'markdown_viewer'):
+            self.markdown_viewer.set_content("")
+
+        if hasattr(self, 'st_content_viewer'):  # Если у вас есть отдельный виджет для ST
+            self.st_content_viewer.clear()
+
+        # Или если используется единый виджет:
+        if hasattr(self, 'content_view'):
+            self.content_view.clear()
+
+
     # Метод удаления файла
     def remove_file(self, file_path):
+        """Удаляет файл из дерева и из сохраненных данных"""
+        # Находим индекс файла
+        for i in range(len(self.tree_model.root_item.child_items)):
+            item = self.tree_model.root_item.child_items[i]
+            if item.item_data[2] == file_path:
+                index = self.tree_model.index(i, 0, QModelIndex())
+                self.tree_model.remove_item(index, False)  # Удаляем только из дерева
+                break
+
+        # Удаляем из сохраненных данных
+        self._remove_file_from_json(file_path)
+
+        # Если удаляемый файл был текущим, очищаем просмотр
+        if self.current_file == file_path:
+            self.markdown_viewer.set_content("")
+            self.current_file = None
+
+    #TODO - разобраться
+    def remove_file_old(self, file_path):
         """Удаляет файл из дерева и из сохраненных данных"""
         # Находим и удаляем файл из модели
         for i in range(len(self.tree_model.root_item.child_items)):
@@ -544,7 +579,8 @@ class SidePanel(QWidget):
 
         # Если удаляемый файл был текущим, очищаем просмотр
         if self.current_file == file_path:
-            self.content_view.clear()
+            #self.content_view.clear()
+            self.content_viewer.set_content("")
             self.current_file = None
 
     def _show_tree_context_menu(self, pos):

@@ -50,7 +50,44 @@ class DeleteManager(QObject):
         self.parser = parser  # Парсер для работы с содержимым ST-файлов
         self.logger = logging.getLogger(self.__class__.__name__)  # Логгер для записи событий
 
-    def execute_removal(self, index, delete_from_disk: bool = False) -> Tuple[bool, str]:
+    #TODO - разобраться
+    def execute_removal(self, index, delete_from_disk=False) -> Tuple[bool, str]:
+        """Унифицированный метод удаления с улучшенной обработкой типов."""
+        if not index.isValid():
+            return False, "Неверный индекс элемента"
+
+        item = index.internalPointer()
+        item_type = item.item_data[1]
+        item_path = item.item_data[2] if len(item.item_data) > 2 else None
+
+        try:
+            # Удаление с диска для поддерживаемых типов
+            if delete_from_disk and item_type in ['file', 'markdown'] and item_path:
+                try:
+                    os.remove(item_path)
+                except OSError as e:
+                    return False, f"Ошибка удаления файла: {e.strerror}"
+
+            # Выбор стратегии удаления
+            if item_type in ['template', 'folder']:
+                success = self._remove_st_item(item.item_data)
+            else:
+                success = self.tree_model.removeRow(index.row(), index.parent())
+
+            #TODO - тут ошибка
+
+            # Унифицированное формирование сообщения
+            msg = self._generate_removal_message(item_type, item_path, success, delete_from_disk)
+            self.removal_complete.emit(success, msg)
+            return success, msg
+
+        except Exception as e:
+            error_msg = f"Системная ошибка: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            self.removal_complete.emit(False, error_msg)
+            return False, error_msg
+    #TODO - устарел нужно будет удалить
+    def execute_removal_old(self, index, delete_from_disk: bool = False) -> Tuple[bool, str]:
         """Основной метод для выполнения операции удаления.
 
         Args:

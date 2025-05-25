@@ -230,3 +230,44 @@ class STFileTreeModel(QAbstractItemModel):
             flags |= Qt.ItemIsAutoTristate | Qt.ItemIsUserCheckable
 
         return flags
+
+
+    def removeRow(self, row, parent=QModelIndex()):
+        """Удаляет строку из модели (стандартный метод QAbstractItemModel)
+
+        Args:
+            row: int - номер строки для удаления
+            parent: QModelIndex - родительский индекс
+
+        Returns:
+            bool: True если удаление прошло успешно
+        """
+        if not parent.isValid():
+            parent_item = self.root_item
+        else:
+            parent_item = parent.internalPointer()
+
+        if row < 0 or row >= len(parent_item.child_items):
+            return False
+
+        self.beginRemoveRows(parent, row, row)
+        parent_item.child_items.pop(row)
+        self.endRemoveRows()
+        return True
+
+    def get_item_path(self, index):
+        """Возвращает путь к файлу для элемента
+
+        Args:
+            index: QModelIndex - индекс элемента
+
+        Returns:
+            str: путь к файлу или None если элемент не файл
+        """
+        if not index.isValid():
+            return None
+
+        item = index.internalPointer()
+        if item.item_data[1] in ['file', 'markdown']:
+            return item.item_data[2]
+        return None
