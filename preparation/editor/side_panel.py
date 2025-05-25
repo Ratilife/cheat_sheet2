@@ -547,14 +547,21 @@ class SidePanel(QWidget):
             self.content_view.clear()
             self.current_file = None
 
-    #TODO доработать работает некоректно
     def _show_tree_context_menu(self, pos):
-        """Метод отображения контекстного меню для дерева."""
+        """Показывает контекстное меню для дерева файлов
+            Args:
+            pos: QPoint - позиция курсора мыши при вызове контекстного меню
+        """
+        # Получаем индекс элемента дерева по позиции клика
         index = self.tree_view.indexAt(pos)
+        # Если индекс невалидный (клик мимо элементов), выходим из метода
         if not index.isValid():
             return
 
+        # Получаем объект элемента дерева по индексу
         item = index.internalPointer()
+
+        # Создаем объект контекстного меню
         menu = QMenu(self)
 
         # Определяем тип элемента
@@ -583,25 +590,7 @@ class SidePanel(QWidget):
                 # Для не-файлов delete_from_disk не применяется
             )
 
-        menu.exec(self.tree_view.viewport().mapToGlobal(pos))
-
-    def _show_tree_context_menu_old(self, pos):
-        """Показывает контекстное меню для дерева файлов
-            Args:
-            pos: QPoint - позиция курсора мыши при вызове контекстного меню
-        """
-        # Получаем индекс элемента дерева по позиции клика
-        index = self.tree_view.indexAt(pos)
-        # Если индекс невалидный (клик мимо элементов), выходим из метода
-        if not index.isValid():
-            return
-
-        # Получаем объект элемента дерева по индексу
-        item = index.internalPointer()
-
-        # Создаем объект контекстного меню
-        menu = QMenu(self)
-        # Проверяем тип элемента (не является ли он файлом)
+            # Проверяем тип элемента (не является ли он файлом)
         if item.item_data[1] != "file":
             # Действие для удаления файла
             remove_action = QAction("Удалить из списка", self)
