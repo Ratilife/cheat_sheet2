@@ -19,7 +19,7 @@
 """
 
 from PySide6.QtCore import (Signal, QObject)
-from typing import Tuple
+from typing import Tuple, Optional
 import logging
 import os
 
@@ -86,6 +86,36 @@ class DeleteManager(QObject):
             self.logger.error(error_msg, exc_info=True)
             self.removal_complete.emit(False, error_msg)
             return False, error_msg
+
+    def _generate_removal_message(self, item_type: str, item_path: Optional[str], success: bool,
+                                  delete_from_disk: bool) -> str:
+        """Формирует сообщение о результате удаления.
+
+        Args:
+            item_type: Тип элемента ('file', 'markdown', 'template', 'folder')
+            item_path: Путь к файлу (если есть)
+            success: Статус операции
+            delete_from_disk: Флаг удаления с диска
+
+        Returns:
+            Строка с сообщением для пользователя
+        """
+        if not success:
+            return f"Не удалось удалить {item_type}"
+
+        item_name = os.path.basename(item_path) if item_path else item_type
+
+        if item_type in ['file', 'markdown']:
+            action = "удален полностью" if delete_from_disk else "удален из дерева"
+            return f"Файл {item_name} {action}"
+        elif item_type == 'template':
+            return f"Шаблон '{item_name}' успешно удален"
+        elif item_type == 'folder':
+            return f"Папка '{item_name}' успешно удалена"
+        else:
+            return f"Элемент '{item_name}' успешно удален"
+
+
     #TODO - устарел нужно будет удалить
     def execute_removal_old(self, index, delete_from_disk: bool = False) -> Tuple[bool, str]:
         """Основной метод для выполнения операции удаления.
@@ -159,6 +189,7 @@ class DeleteManager(QObject):
             self.logger.error(f"Ошибка удаления ST элемента: {e}")
             return False  # Ошибка операции
 
+    #TODO - метод _get_file_removal_msg связан с методом execute_removal_old
     def _get_file_removal_msg(self, path: str, from_disk: bool, success: bool) -> str:
         """Формирует пользовательское сообщение об удалении файла.
 

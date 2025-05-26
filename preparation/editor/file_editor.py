@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QIcon
 from delegates import TreeItemDelegate
 from md_file_parser import MarkdownViewer
+from removal_dialog import RemovalDialog
 
 #TODO определится нужен класс MarkdownEditor
 class MarkdownEditor(QWidget):

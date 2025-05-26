@@ -533,8 +533,8 @@ class SidePanel(QWidget):
     #TODO - что это за метод определится нужен этот метод
     def _clear_viewer(self):
         """Очищает все просмотрщики содержимого"""
-        if hasattr(self, 'markdown_viewer'):
-            self.markdown_viewer.set_content("")
+        if hasattr(self, 'content_viewer'):
+            self.content_viewer.set_content("")
 
         if hasattr(self, 'st_content_viewer'):  # Если у вас есть отдельный виджет для ST
             self.st_content_viewer.clear()
@@ -552,7 +552,8 @@ class SidePanel(QWidget):
             item = self.tree_model.root_item.child_items[i]
             if item.item_data[2] == file_path:
                 index = self.tree_model.index(i, 0, QModelIndex())
-                self.tree_model.remove_item(index, False)  # Удаляем только из дерева
+                #self.tree_model.remove_item(index, False)  # Удаляем только из дерева
+                self.tree_model.removeRow(i, QModelIndex())
                 break
 
         # Удаляем из сохраненных данных
@@ -560,7 +561,7 @@ class SidePanel(QWidget):
 
         # Если удаляемый файл был текущим, очищаем просмотр
         if self.current_file == file_path:
-            self.markdown_viewer.set_content("")
+            self.content_viewer.set_content("")
             self.current_file = None
 
     #TODO - разобраться
