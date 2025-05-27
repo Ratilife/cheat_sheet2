@@ -418,47 +418,65 @@ class FileEditorWindow(QMainWindow):
         """Загрузка содержимого файла в соответствующий редактор"""
         try:
             # Сначала сбрасываем состояние редакторов
-            self._reset_editors()  # <-- НОВАЯ СТРОКА
+            self._reset_editors()
+            # Вызов метода _reset_editors() для очистки всех редакторов и приведения их в исходное состояние
+            # Это гарантирует, что перед загрузкой нового файла не останется содержимого от предыдущего
 
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
+            # Открытие файла по переданному пути в режиме чтения с кодировкой UTF-8
+            # Чтение всего содержимого файла в переменную content
 
             self.current_file_path = file_path
+            # Сохранение пути к текущему файлу в атрибуте класса для последующего использования
 
             if file_path.endswith('.st'):
+                # Проверка расширения файла - если это .st файл
                 # ST файл - используем text_editor
                 self.current_structure = self._parse_st_file(content)
+                # Парсинг содержимого ST файла в структуру данных и сохранение в current_structure
                 self.text_editor.setPlainText(content)
+                # Установка содержимого файла в текстовый редактор (QTextEdit)
                 #self._update_st_display() почему убрали?
 
                 # Настройка интерфейса для ST файлов
                 self.btn_new_folder.setEnabled(True)
                 self.btn_new_template.setEnabled(True)
+                # Активация кнопок для работы с папками и шаблонами (актуально только для ST файлов)
                 self.text_mode_btn.setEnabled(True)
                 self.markdown_mode_btn.setEnabled(True)
+                # Активация переключателей режимов просмотра (текст/Markdown)
 
                 # Показываем нужные редакторы
                 self.text_editor.show()              # <-- Гарантированно показываем text_editor
+                # Отображение текстового редактора
                 self.md_viewer.hide()
+                # Скрытие просмотрщика Markdown
                 #self.text_mode_btn.setChecked(True)  #  сброс режима просмотра
             else:
+                # Если файл не .st (предположительно .md)
                 # MD файл - используем md_viewer
                 self.md_viewer.set_content(content)
-
+                # Установка содержимого файла в просмотрщик Markdown
 
                 # Настройка интерфейса для MD файлов
                 self.btn_new_folder.setEnabled(False)
                 self.btn_new_template.setEnabled(False)
+                # Деактивация кнопок для работы с папками и шаблонами (неактуально для MD файлов)
                 self.text_mode_btn.setEnabled(False)
                 self.markdown_mode_btn.setEnabled(False)
+                # Деактивация переключателей режимов просмотра (для MD файлов всегда только один режим)
                 #self.text_mode_btn.setChecked(True)  #  сброс режима просмотра
 
-                self.text_editor.hide()
-                self.md_viewer.show()
+                self.text_editor.hide()  # Скрытие текстового редактора
+                self.md_viewer.show()    # Отображение просмотрщика Markdown
 
         except Exception as e:
+            # Обработка возможных исключений при работе с файлом
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить файл: {str(e)}")
-            self._reset_editors()  # <-- НОВАЯ СТРОКА ДЛЯ ОБРАБОТКИ ОШИБОК
+            # Показ сообщения об ошибке с деталями исключения
+            self._reset_editors()
+            # Сброс редакторов в случае ошибки
     def _save_file(self):
         """Сохранение текущего файла."""
         if not self.current_file_path:
@@ -641,29 +659,56 @@ class FileEditorWindow(QMainWindow):
         """
         Создание нового ST файла.
         Открывает диалог сохранения файла и инициализирует базовую структуру.
-        """
+            Основное назначение:
+                1. Создание нового файла с расширением .st
+                2. Инициализация базовой структуры файла
+                3. Обновление состояния приложения после создания
+         """
+
         path, _ = QFileDialog.getSaveFileName(
             self, "Создать ST файл", "", "ST Files (*.st)")
+        # Открытие диалогового окна сохранения файла:
+        # - Заголовок: "Создать ST файл"
+        # - Начальная директория не указана (пустая строка)
+        # - Фильтр файлов: только .st расширение
+        # Возвращает путь к файлу и выбранный фильтр (который игнорируется)
 
         if path:
+            # Проверка, что пользователь не отменил диалог (путь не пустой)
             # Добавляем расширение, если его нет
             if not path.endswith('.st'):
                 path += '.st'
-
+            # Гарантируем, что файл будет иметь правильное расширение
+            # Добавляем .st, если его нет в конце пути
             try:
                 # Создаем файл с корректной структурой
                 with open(path, 'w', encoding='utf-8') as f:
+                    # Открытие файла для записи в кодировке UTF-8
+                    # Контекстный менеджер гарантирует закрытие файла
+
                     # Базовая структура нового ST файла
                     file_name = os.path.basename(path).replace('.st', '')
+                    # Получаем имя файла без расширения:
+                    # 1. os.path.basename() извлекает имя файла из пути
+                    # 2. replace() удаляет .st, если есть
                     content = f"""{{1, {{"{file_name}", 1, 0, "", ""}}, []}}"""
+                    # Формирование начальной структуры ST файла:
+                    # - Корневой элемент с типом 1 (папка)
+                    # - Имя папки совпадает с именем файла
+                    # - Пустой список дочерних элементов
                     f.write(content)
+                    # Запись сформированной структуры в файл
 
                 # Обновляем текущий файл
                 self.current_file_path = path
+                # Сохраняем путь к новому файлу в атрибуте класса
                 self._load_file_content(path)  # Загружаем содержимое файла
-
+                # Вызов метода для загрузки содержимого только что созданного файла
+                # в соответствующий редактор
                 # Отправляем сигнал о создании файла
-                self.file_created.emit(path)
+                self.file_created.emit(path) #?
+                # Генерация сигнала с путем к созданному файлу
+                # (подключенные слоты могут обновить дерево файлов и т.д.)
 
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Не удалось создать файл: {str(e)}")
@@ -795,6 +840,7 @@ class FileEditorWindow(QMainWindow):
             self._save_st_file()  # Сохраняем изменения
             self._update_tree_view()  # Обновляем отображение дерева
 
+    #TODO - повторяющийся метод
     def _open_file(self):
         """Открытие существующего файла через диалоговое окно."""
         path, _ = QFileDialog.getOpenFileName(
@@ -938,17 +984,35 @@ class FileEditorWindow(QMainWindow):
             self.md_viewer.hide()
 
     def _reset_editors(self):
-        """Сбрасывает состояние всех редакторов"""
+        """Сбрасывает состояние всех редакторов
+         Основное назначение метода - приведение всех редакторов в исходное состояние
+         Используется при:
+         1. Инициализации окна
+         2. Очистке перед загрузкой нового файла
+         3. Обработке ошибок
+         4. Удалении файла
+        """
         self.text_editor.clear()
+        # Очистка содержимого основного текстового редактора (QTextEdit)
+        # Удаляет весь текст и сбрасывает состояние редактора
         self.md_viewer.set_content("")
+        # Очистка просмотрщика Markdown
+        # Передает пустую строку в метод set_content() просмотрщика
         self.text_editor.show()
+        # Гарантированное отображение основного текстового редактора
+        # Делает виджет видимым (если был скрыт)
         self.md_viewer.hide()
+        # Гарантированное скрытие просмотрщика Markdown
+        # Делает виджет невидимым (если был показан)
         self.text_mode_btn.setChecked(True)
+        # Установка переключателя режима просмотра в положение "Текст"
+        # Активирует радио-кнопку текстового режима (если доступна)
 
     def _remove_item(self, index, delete_from_disk=False):
         if self.delete_manager.execute_removal(index, delete_from_disk):
             self._save_files_to_json()
 
+    # TODO - повторяющийся метод
     def _delete_file(self):
         if not self.current_file_path:
             return
