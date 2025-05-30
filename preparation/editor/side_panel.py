@@ -253,18 +253,24 @@ class SidePanel(QWidget):
         return os.path.join(os.path.dirname(__file__), "saved_files.json")
 
     def _save_files_to_json(self):
-        """Сохраняет список загруженных файлов в JSON"""
+        """Сохраняет список загруженных файлов в JSON, исключая дубликаты"""
         save_path = self._get_save_path()
         files = []
+        seen_paths = set()  # Множество для отслеживания уже добавленных путей
 
         # Собираем пути всех загруженных файлов (как st, так и md)
         for i in range(len(self.tree_model.root_item.child_items)):
             item = self.tree_model.root_item.child_items[i]
-            if item.item_data[1] in ["file", "markdown"]:  # Изменено условие
-                files.append({
-                    "path": item.item_data[2],
-                    "type": item.item_data[1]  # Сохраняем тип файла
-                })
+            if item.item_data[1] in ["file", "markdown"]:
+                file_path = item.item_data[2]
+
+                # Проверяем, не добавляли ли мы уже этот путь
+                if file_path not in seen_paths:
+                    files.append({
+                        "path": file_path,
+                        "type": item.item_data[1]  # Сохраняем тип файла
+                    })
+                    seen_paths.add(file_path)  # Добавляем путь в множество
 
         # Сохраняем в JSON
         with open(save_path, 'w', encoding='utf-8') as f:
