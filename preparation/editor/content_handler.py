@@ -132,6 +132,10 @@ class STFileTreeModel(QAbstractItemModel):
 
     def add_file(self, file_path):
         """Добавляет новый ST-файл в модель"""
+        if any(item.item_data[2] == file_path for item in self.root_item.child_items):
+            print(f"File {file_path} already exists in tree!")
+            return
+
         # Получаем результат парсинга, который теперь содержит и структуру, и имя корневой папки
         result = self.parser.parse_st_file(file_path)
 
