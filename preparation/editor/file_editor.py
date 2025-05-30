@@ -918,16 +918,6 @@ class FileEditorWindow(QMainWindow):
             self._update_tree_view()  # Обновляем отображение дерева
             # Перерисовка дерева для отображения нового шаблона
 
-    #TODO - повторяющийся метод
-    def _open_file(self):
-        """Открытие существующего файла через диалоговое окно."""
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Открыть файл", "",
-            "ST Files (*.st);;Markdown Files (*.md)")
-
-        if path:
-            self._load_file_content(path)  # Загружаем содержимое файла
-
     '''def _load_file_content(self, path):
         """
         Загрузка содержимого файла в редактор.
