@@ -1,7 +1,7 @@
 import sys
 import os
 import json
-from PySide6.QtWidgets import (QSplitter, QTreeView, QTextEdit, QWidget,
+from PySide6.QtWidgets import (QSplitter, QTreeView, QWidget,
                                QVBoxLayout, QApplication, QMenu,
                                QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog, QMessageBox)
 from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject, QRect, QSize,
@@ -9,7 +9,7 @@ from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject, QRect, QSiz
 from PySide6.QtGui import QAction,  QColor, QCursor, QPen, QPainter
 
 
-from file_editor import FileEditorWindow
+from preparation.editor2.ui.file_editor import FileEditorWindow
 from delegates import TreeItemDelegate
 from content_handler import STFileTreeModel
 from md_file_parser import MarkdownViewer
