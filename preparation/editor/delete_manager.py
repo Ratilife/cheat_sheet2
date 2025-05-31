@@ -18,10 +18,11 @@
    - доступ к переменным окружения
 """
 
-from PySide6.QtCore import (Signal, QObject)
+from PySide6.QtCore import (Signal, QObject, QModelIndex)
 from typing import Tuple, Optional
 import logging
 import os
+import  json
 
 
 class DeleteManager(QObject):
@@ -210,3 +211,36 @@ class DeleteManager(QObject):
         if not success:
             return f"Не удалось удалить файл: {os.path.basename(path)}"
         return f"Файл {os.path.basename(path)} {action}"
+
+
+    def remove_file(self, file_path):
+        """Удаляет файл из дерева и из сохраненных данных"""
+        # Находим индекс файла
+        for i in range(len(self.tree_model.root_item.child_items)):
+            item = self.tree_model.root_item.child_items[i]
+            if item.item_data[2] == file_path:
+                index = self.tree_model.index(i, 0, QModelIndex())
+                self.tree_model.removeRow(i, QModelIndex())
+                break
+
+        # Удаляем из сохраненных данных
+        self._remove_file_from_json(file_path)
+        return True, f"Файл {os.path.basename(file_path)} удален"
+
+    def _remove_file_from_json(self, file_path):
+        """Удаляет файл из сохраненного списка"""
+        save_path = os.path.join(os.path.dirname(__file__), "saved_files.json")
+        if not os.path.exists(save_path):
+            return
+
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                files = json.load(f)
+
+            files = [f for f in files if f["path"] != file_path]
+
+            with open(save_path, 'w', encoding='utf-8') as f:
+                json.dump(files, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"Ошибка при удалении файла из сохраненных: {e}")
+            return False, f"Ошибка при удалении файла из сохраненных: {e}"

@@ -1,59 +1,12 @@
 # context_menu.py
-import os
-import json
-from PySide6.QtWidgets import QMenu, QAction, QMessageBox
-from PySide6.QtCore import QModelIndex
+from PySide6.QtWidgets import QMenu, QAction
 
 
 class ContextMenuHandler:
-    def __init__(self, tree_view, tree_model, delete_manager, parent=None):
+    def __init__(self, tree_view, delete_manager):
         self.tree_view = tree_view
-        self.tree_model = tree_model
         self.delete_manager = delete_manager
-        self.parent = parent  # Сохраняем ссылку на родительский виджет
 
-    def _get_save_path(self):
-        """Возвращает путь к файлу сохранения"""
-        return os.path.join(os.path.dirname(__file__), "saved_files.json")
-
-    #TODO - Удалить метод
-    def _remove_file_from_json(self, file_path):
-        """Удаляет файл из сохраненного списка"""
-        save_path = self._get_save_path()
-        if not os.path.exists(save_path):
-            return
-
-        try:
-            with open(save_path, 'r', encoding='utf-8') as f:
-                files = json.load(f)
-
-            files = [f for f in files if f["path"] != file_path]
-
-            with open(save_path, 'w', encoding='utf-8') as f:
-                json.dump(files, f, ensure_ascii=False, indent=4)
-        except Exception as e:
-            print(f"Ошибка при удалении файла из сохраненных: {e}")
-
-    # TODO - Удалить метод
-    def remove_file(self, file_path):
-        """Удаляет файл из дерева и из сохраненных данных"""
-        # Находим индекс файла
-        for i in range(len(self.tree_model.root_item.child_items)):
-            item = self.tree_model.root_item.child_items[i]
-            if item.item_data[2] == file_path:
-                index = self.tree_model.index(i, 0, QModelIndex())
-                self.tree_model.removeRow(i, QModelIndex())
-                break
-
-        # Удаляем из сохраненных данных
-        self._remove_file_from_json(file_path)
-
-        # Если удаляемый файл был текущим, очищаем просмотр
-        if hasattr(self.parent, 'current_file') and self.parent.current_file == file_path:
-            if hasattr(self.parent, 'content_viewer'):
-                self.parent.content_viewer.set_content("")
-            self.parent.current_file = None
-    #TODO - что делать с этим методом, думаю его нужно оставить
     def show_tree_context_menu(self, pos):
         """Показывает контекстное меню для дерева файлов"""
         index = self.tree_view.indexAt(pos)
@@ -83,7 +36,7 @@ class ContextMenuHandler:
         if item.item_data[1] != "file":
             remove_action = QAction("Удалить из списка", self.tree_view)
             remove_action.triggered.connect(
-                lambda: self.remove_file(item.item_data[2]))
+                lambda: self.delete_manager.remove_file(item.item_data[2]))
             menu.addAction(remove_action)
         elif item.item_data[1] == "folder":
             expand_action = QAction("Развернуть", self.tree_view)
