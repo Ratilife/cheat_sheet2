@@ -262,11 +262,12 @@ class STFileTreeModel(QAbstractItemModel):
         return None
 
     def get_item_type(self, index):
+        """Возвращает тип элемента ('file', 'folder', etc.)."""
         item = index.internalPointer()
         return item.item_data[1]  # 'folder', 'file' и т.д.
 
     def get_item_level(self, index):
-        # Возвращает уровень вложенности
+        """Возвращает уровень вложенности элемента."""
         level = 0
         while index.parent().isValid():
             level += 1

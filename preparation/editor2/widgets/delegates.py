@@ -11,7 +11,7 @@ class TreeItemDelegate(QStyledItemDelegate):
     - Гибкими отступами и настройками
     """
 
-    def __init__(self, parent=None, config=None):
+    def __init__(self, parent=None, config=None, indent=20, button_size=16):
         """
         :param parent: Родительский виджет (обычно QTreeView)
         :param config: Словарь с настройками {
@@ -43,6 +43,9 @@ class TreeItemDelegate(QStyledItemDelegate):
 
         # Инициализация стилей
         self._init_styles()
+
+        self.indent = indent  # Отступ на уровень вложенности
+        self.button_size = button_size
 
     def _init_styles(self):
         """Инициализация стилей для разных типов элементов"""
@@ -166,11 +169,31 @@ class TreeItemDelegate(QStyledItemDelegate):
         return base_size
 
     def editorEvent(self, event, model, option, index):
+        if event.type() == QEvent.MouseButtonRelease:
+            if self._is_expand_button_clicked(event.pos(), option.rect):
+                model.toggle_expand(index)  # Делегируем менеджеру
+    #TODO - проверить возможно нужно переделать
+    def editorEvent_old(self, event, model, option, index):
         """
-        Обработка кликов по кнопкам раскрытия
-        """
+            Обрабатывает события редактора для элементов дерева, в частности клики по кнопкам раскрытия/сворачивания.
+
+            Args:
+                event (QEvent): Событие, которое нужно обработать
+                model (QAbstractItemModel): Модель данных, связанная с элементом
+                option (QStyleOptionViewItem): Параметры отображения элемента
+                index (QModelIndex): Индекс элемента, для которого происходит событие
+
+            Returns:
+                bool: True если событие было обработано, иначе возвращает результат родительского метода
+            """
+        # Получаем тип элемента через пользовательскую роль (UserRole + 2)
         item_type = index.data(Qt.UserRole + 2)
 
+        # Проверяем условия для обработки клика:
+        # 1. Это событие отпускания кнопки мыши
+        # 2. Нажата левая кнопка мыши
+        # 3. Элемент является папкой
+        # 4. Папка имеет дочерние элементы
         # Только для папок с детьми
         if (event.type() == QEvent.MouseButtonRelease and
                 event.button() == Qt.LeftButton and
@@ -178,16 +201,24 @@ class TreeItemDelegate(QStyledItemDelegate):
                 model.hasChildren(index)):
 
             # Проверяем, был ли клик по кнопке
+            # Получаем уровень вложенности элемента (по умолчанию 0, если данные не установлены)
             level = index.data(Qt.UserRole + 1) or 0
+            # Вычисляем прямоугольник, где должна находиться кнопка раскрытия:
+            # - Отступ слева зависит от уровня вложенности и конфигурационного параметра indent
+            # - Ширина и высота берутся из конфигурации
             btn_rect = QRect(
-                option.rect.left() + level * self.config['indent'],
-                option.rect.top(),
-                self.config['button_size'],
-                option.rect.height()
+                option.rect.left() + level * self.config['indent'],  # X-координата с учетом отступа
+                option.rect.top(),                                   # Y-координата
+                self.config['button_size'],                          # Ширина кнопки
+                option.rect.height()                                 # Высота равна высоте элемента
             )
 
+            # Проверяем, попадает ли позиция клика в область кнопки
             if btn_rect.contains(event.pos()):
+                # Переключаем состояние раскрытия/сворачивания элемента
                 option.widget.setExpanded(index, not option.widget.isExpanded(index))
+                # Возвращаем True, указывая что событие обработано
                 return True
-
+        # Если условия не выполнены или клик был вне кнопки,
+        # передаем событие родительскому классу для стандартной обработки
         return super().editorEvent(event, model, option, index)
