@@ -9,6 +9,9 @@ from delegates import TreeItemDelegate
 from md_file_parser import MarkdownViewer
 from removal_dialog import RemovalDialog
 
+
+
+
 #TODO определится нужен класс MarkdownEditor
 class MarkdownEditor(QWidget):
     """Класс для редактирования MD файлов с поддержкой Markdown"""
@@ -290,6 +293,9 @@ class FileEditorWindow(QMainWindow):
         self.tree_view.setRootIsDecorated(True)         # Показываем корневой элемент
         self.tree_view.setExpandsOnDoubleClick(True)    # Раскрытие двойным кликом
         self.tree_view.setSortingEnabled(False)         # Сортировка отключена
+
+        self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree_view.customContextMenuRequested.connect(self._show_tree_context_menu)
 
         # Установите делегат (если он используется)
         if hasattr(self.parent_panel, 'delegate'):
@@ -1096,3 +1102,7 @@ class FileEditorWindow(QMainWindow):
             success, msg = self.delete_manager.execute_removal(index, delete_from_disk)
             if success:
                 self._reset_editors()
+
+    def _show_tree_context_menu(self, pos):
+        """Показывает контекстное меню для дерева файлов"""
+        self.context_menu_handler.show_tree_context_menu(pos)

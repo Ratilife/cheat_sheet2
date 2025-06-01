@@ -1,6 +1,6 @@
 # context_menu.py
-from PySide6.QtWidgets import QMenu, QAction
-
+from PySide6.QtWidgets import QMenu
+from PySide6.QtGui import QAction
 
 class ContextMenuHandler:
     def __init__(self, tree_view, delete_manager):
