@@ -9,6 +9,7 @@ from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject, QRect, QSiz
 from PySide6.QtGui import QAction,  QColor, QCursor, QPen, QPainter
 from preparation.editor2.ui.file_editor import FileEditorWindow
 from preparation.editor2.widgets.delegates import TreeItemDelegate
+from preparation.editor2.models.st_file_tree_model import STFileTreeModel
 
 
 # Класс для обработки сигналов панели
@@ -23,7 +24,8 @@ class SidePanelSignals(QObject):
 class SidePanel(QWidget):
 
     def __init__(self):
-
+        # Инициализация модели данных
+        self.tree_model = STFileTreeModel()
         self.tree_view = QTreeView()  # Создание дерева
 
         # 1. Инициализация делегата (минимальная настройка)
