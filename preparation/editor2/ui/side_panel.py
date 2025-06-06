@@ -9,7 +9,7 @@ from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject, QRect, QSiz
 from PySide6.QtGui import QAction,  QColor, QCursor, QPen, QPainter
 from preparation.editor2.ui.file_editor import FileEditorWindow
 from preparation.editor2.widgets.delegates import TreeItemDelegate
-from preparation.editor2.models.st_file_tree_model import STFileTreeModel
+from preparation.editor2.utils.tree_manager import TreeManager
 from preparation.editor2.managers.tree_model_manager import TreeModelManager
 
 
@@ -35,23 +35,8 @@ class SidePanel(QWidget):
         self.tree_model_manager = TreeModelManager()  # Подключаем менеджер
         self.tree_model_manager.delete_manager.removal_complete.connect(self._handle_removal_result)
 
-        # 2. Настройка TreeView
-        self.tree_view = QTreeView()  # Создание дерева
-        self.tree_view.setModel(self.tree_model)  # Привязываем модель к виджету
 
-
-
-        # это убрать
-        # 3. Инициализация делегата (минимальная настройка)
-
-        self.delegate = TreeItemDelegate(parent=self.tree_view)  # ← Делегат привязан к tree_view
-        self.tree_view.setItemDelegate(self.delegate)  # ← Установка делегата
-        #5---
-
-        # 4. Установка модели (ПОСЛЕ делегата!)
-        self.tree_view.setModel(self.tree_model)
-
-        # 5. Инициализация пользовательского интерфейса
+        # 2. Инициализация пользовательского интерфейса
         self._init_ui()
 
         #6.
