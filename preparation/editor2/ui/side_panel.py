@@ -10,6 +10,7 @@ from PySide6.QtGui import QAction,  QColor, QCursor, QPen, QPainter
 from preparation.editor2.ui.file_editor import FileEditorWindow
 from preparation.editor2.widgets.delegates import TreeItemDelegate
 from preparation.editor2.models.st_file_tree_model import STFileTreeModel
+from preparation.editor2.managers.tree_model_manager import TreeModelManager
 
 
 # Класс для обработки сигналов панели
@@ -30,20 +31,30 @@ class SidePanel(QWidget):
         # Создаем экземпляр класса для сигналов
         self.signals = SidePanelSignals()
 
-        # Инициализация модели данных
-        self.tree_model = STFileTreeModel()
-        self.tree_view = QTreeView()  # Создание дерева
+        # 1. Инициализация модели и менеджеров
+        self.tree_model_manager = TreeModelManager()  # Подключаем менеджер
+        self.tree_model_manager.delete_manager.removal_complete.connect(self._handle_removal_result)
 
-        # 1. Инициализация делегата (минимальная настройка)
+        # 2. Настройка TreeView
+        self.tree_view = QTreeView()  # Создание дерева
+        self.tree_view.setModel(self.tree_model)  # Привязываем модель к виджету
+
+
+
+        # это убрать
+        # 3. Инициализация делегата (минимальная настройка)
 
         self.delegate = TreeItemDelegate(parent=self.tree_view)  # ← Делегат привязан к tree_view
         self.tree_view.setItemDelegate(self.delegate)  # ← Установка делегата
+        #5---
 
-        # 2. Установка модели (ПОСЛЕ делегата!)
+        # 4. Установка модели (ПОСЛЕ делегата!)
         self.tree_view.setModel(self.tree_model)
 
-        # Инициализация пользовательского интерфейса
+        # 5. Инициализация пользовательского интерфейса
         self._init_ui()
+
+        #6.
 
     # 1. Инициализация и базовый UI
     def _init_ui(self):
@@ -150,6 +161,15 @@ class SidePanel(QWidget):
         self.pin_left_action.setChecked(self.dock_position == "left")
         self.pin_right_action.setChecked(self.dock_position == "right")
         self.float_action.setChecked(self.dock_position == "float")
+
+    def _handle_removal_result(self, success, message):
+        """Обработчик результата удаления."""
+        if success:
+            self.tree_model_manager.file_manager.save_files_to_json()
+            QMessageBox.information(self, "Успех", message)
+        else:
+            QMessageBox.warning(self, "Ошибка", message)
+
 
 if __name__ == "__main__":
     # Создаем экземпляр приложения

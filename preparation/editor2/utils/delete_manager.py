@@ -244,3 +244,4 @@ class DeleteManager(QObject):
         except Exception as e:
             print(f"Ошибка при удалении файла из сохраненных: {e}")
             return False, f"Ошибка при удалении файла из сохраненных: {e}"
+

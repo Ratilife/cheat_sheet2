@@ -3,7 +3,7 @@ from preparation.editor2.models.st_file_tree_model import STFileTreeModel
 from preparation.editor2.parsers.st_file_parser import STFileParserWrapper
 from preparation.editor2.parsers.md_file_parser import MarkdownListener
 from preparation.editor2.utils.delete_manager import DeleteManager
-
+from preparation.editor2.managers.file_manager import FileManager
 
 class TreeModelManager:
     """
@@ -18,6 +18,11 @@ class TreeModelManager:
         self.st_parser = STFileParserWrapper()
         self.md_parser = MarkdownListener()
         self.delete_manager = DeleteManager(self.tree_model, self.st_parser)
+
+        # Добавляем FileManager
+        self.file_manager = FileManager()
+        self.file_manager.tree_model = self.tree_model  # Передаем модель в FileManager
+
 
     # --- Методы для работы с данными ---
     def add_file(self, file_path: str) -> bool:
