@@ -64,12 +64,3 @@ class FileManager:
         except Exception as e:
             print(f"Ошибка при удалении файла из сохраненных: {e}")
 
-    def add_markdown_file(self, file_path):
-        """Добавляет Markdown файл в модель"""
-        if not os.path.exists(file_path):
-            print(f"Markdown file not found: {file_path}")
-        return
-
-        # Используем новый метод модели для добавления MD файла
-        self.tree_model.add_markdown_file(file_path)   #TODO - в чем проблема
-        print(f"Markdown file added: {file_path}")
