@@ -45,7 +45,7 @@ class FileManager:
         except Exception as e:
             print(f"Ошибка при загрузке сохраненных файлов: {e}")
 
-    def _remove_file_from_json(self, file_path):
+    def remove_file_from_json(self, file_path):
         """Удаляет файл из сохраненного списка"""
         save_path = self._get_save_path()
         if not os.path.exists(save_path):
@@ -64,12 +64,12 @@ class FileManager:
         except Exception as e:
             print(f"Ошибка при удалении файла из сохраненных: {e}")
 
-    def _add_markdown_file(self, file_path):
+    def add_markdown_file(self, file_path):
         """Добавляет Markdown файл в модель"""
         if not os.path.exists(file_path):
             print(f"Markdown file not found: {file_path}")
         return
 
         # Используем новый метод модели для добавления MD файла
-        self.tree_model.add_markdown_file(file_path)
+        self.tree_model.add_markdown_file(file_path)   #TODO - в чем проблема
         print(f"Markdown file added: {file_path}")
