@@ -1,4 +1,5 @@
 import json
+import os
 class FileManager:
 
     def __init__(self):
@@ -21,3 +22,54 @@ class FileManager:
         with open(save_path, 'w', encoding='utf-8') as f:
             json.dump(files, f, ensure_ascii=False, indent=4)
 
+    def load_saved_files(self):
+        """Загружает сохраненные файлы из JSON"""
+        save_path = self._get_save_path()
+        if not os.path.exists(save_path):
+            return
+
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                files = json.load(f)
+                for file_info in files:
+                    file_path = file_info["path"]
+                    file_type = file_info.get("type", "file")
+
+                    if os.path.exists(file_path):
+                        if file_type == "file":
+                            self.tree_model.add_file(file_path)
+                        elif file_type == "markdown":
+                            self.tree_model.add_markdown_file(file_path)  # Используем новый метод
+
+            self.tree_view.expandAll()
+        except Exception as e:
+            print(f"Ошибка при загрузке сохраненных файлов: {e}")
+
+    def _remove_file_from_json(self, file_path):
+        """Удаляет файл из сохраненного списка"""
+        save_path = self._get_save_path()
+        if not os.path.exists(save_path):
+            return
+
+        try:
+            with open(save_path, 'r', encoding='utf-8') as f:
+                files = json.load(f)
+
+            # Удаляем файл из списка (теперь ищем по path в словаре)
+            files = [f for f in files if f["path"] != file_path]
+
+            # Сохраняем обновленный список
+            with open(save_path, 'w', encoding='utf-8') as f:
+                json.dump(files, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"Ошибка при удалении файла из сохраненных: {e}")
+
+    def _add_markdown_file(self, file_path):
+        """Добавляет Markdown файл в модель"""
+        if not os.path.exists(file_path):
+            print(f"Markdown file not found: {file_path}")
+        return
+
+        # Используем новый метод модели для добавления MD файла
+        self.tree_model.add_markdown_file(file_path)
+        print(f"Markdown file added: {file_path}")
