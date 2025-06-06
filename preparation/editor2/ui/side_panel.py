@@ -39,7 +39,6 @@ class SidePanel(QWidget):
         # 2. Инициализация пользовательского интерфейса
         self._init_ui()
 
-        #6.
 
     # 1. Инициализация и базовый UI
     def _init_ui(self):
