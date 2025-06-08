@@ -148,3 +148,9 @@ class TreeManager:
             return len(self.root_item.child_items) > 0
         item = parent.internalPointer()
         return len(item.child_items) > 0
+
+    def _on_tree_item_clicked_Определить_Нужен_Метод(self, index):
+        """Обработка клика по элементу дерева"""
+        item = index.internalPointer()
+        if not item:
+            return

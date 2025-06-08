@@ -1,5 +1,7 @@
 class EditorManager:
 
+    def __init__(self):
+        pass
     def _clear_viewer(self):
         """Очищает все просмотрщики содержимого"""
         if hasattr(self, 'markdown_viewer'):

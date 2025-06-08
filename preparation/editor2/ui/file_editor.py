@@ -32,3 +32,40 @@ class FileEditorWindow(QMainWindow):
 
         # 2. Установка модели
         self.tree_view.setModel(self.tree_model)
+
+    def center_window(self):
+        """Центрирует окно на экране"""
+        frame_geometry = self.frameGeometry()  # Получаем геометрию окна с учетом рамок
+        screen_center = QApplication.primaryScreen().availableGeometry().center()  # Центр экрана
+        frame_geometry.moveCenter(screen_center)  # Совмещаем центры
+        self.move(frame_geometry.topLeft())  # Перемещаем окно
+
+    def _on_tree_item_double_clicked(self, index):
+        """
+        Обработка двойного клика по элементу дерева
+
+        Args:
+            index: Индекс элемента в дереве
+        """
+        if not index.isValid():
+            return
+
+        item = index.internalPointer()
+        if not item:
+            return
+
+        # Загружаем содержимое файла или шаблона
+        if item.item_data[1] in ['file', 'markdown']:
+            file_path = item.item_data[2]
+            self._load_file_content(file_path)
+        elif item.item_data[1] == 'template':
+            self.current_file_path = None
+            self.text_editor.setPlainText(item.item_data[2])
+
+    def _show_tree_context_menu(self, pos):
+        """Показывает контекстное меню для дерева файлов"""
+        self.context_menu_handler.show_tree_context_menu(pos)
+
+    def _remove_item(self, index, delete_from_disk=False):
+        if self.delete_manager.execute_removal(index, delete_from_disk):
+            self._save_files_to_json()
