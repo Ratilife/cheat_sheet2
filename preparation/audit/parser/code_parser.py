@@ -2,6 +2,14 @@ import sys
 from antlr4 import *
 from preparation.audit.parser.antlr4.Python3.PythonLexer import PythonLexer
 from preparation.audit.parser.antlr4.Python3.PythonParser import PythonParser
+from preparation.audit.parser.code_collector import CodeCollector
+
+def start_code_parser(target_file):
+    analysis_results = analyze_python_file(target_file)
+
+    if analysis_results:
+        print_results(analysis_results)
+
 
 def analyze_python_file(file_path: str) -> dict:
     """
@@ -44,3 +52,22 @@ def analyze_python_file(file_path: str) -> dict:
     except Exception as e:
         print(f"Произошла ошибка при анализе файла: {e}")
         return {}
+
+def print_results(results: dict):
+    """Функция для красивого вывода результатов в консоль."""
+    if not results:
+        return
+
+    full_structure = results["full_structure"]
+    if not full_structure:
+        print("  Классы не найдены.")
+    else:
+        for cls in full_structure:
+            print(f"\n  ▶️ Класс: '{cls['class_name']}' (строка: {cls['line_number']})")
+            if not cls['methods']:
+                print("    - Методы не найдены.")
+            else:
+                for method in cls['methods']:
+                    print(f"    - Метод: '{method['method_name']}' (строка: {method['line_number']})")
+                    print(f"      - Возвращаемый тип: {method['return_type']}")
+    print("-" * 40)

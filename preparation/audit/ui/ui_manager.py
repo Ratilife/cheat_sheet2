@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox
 )
 from PySide6.QtCore import QCoreApplication
+from preparation.audit.parser import code_parser
 
 class FileAnalysisApp(QWidget):
     """
@@ -91,6 +92,7 @@ class FileAnalysisApp(QWidget):
         file_path = self.path_edit.text()
         if file_path:
             # Здесь  добавить логику для анализа файла
+            code_parser.start_code_parser(file_path)
             QMessageBox.information(self, "Успешно", f"Выбран файл для анализа:\n{file_path}")
             print(f"Файл для анализа: {file_path}")
         else:
