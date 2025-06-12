@@ -11,7 +11,7 @@ from preparation.editor2.ui.file_editor import FileEditorWindow
 from preparation.editor2.widgets.delegates import TreeItemDelegate
 from preparation.editor2.utils.tree_manager import TreeManager
 from preparation.editor2.managers.tree_model_manager import TreeModelManager
-
+from preparation.editor2.widgets.markdown_viewer import MarkdownViewer
 
 # Класс для обработки сигналов панели
 class SidePanelSignals(QObject):
@@ -28,15 +28,20 @@ class SidePanel(QWidget):
         # - Всегда поверх других окон (WindowStaysOnTopHint)
         super().__init__(parent, Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
 
-        # Создаем экземпляр класса для сигналов
+        # 1. Создаем экземпляр класса для сигналов
         self.signals = SidePanelSignals()
 
-        # 1. Инициализация модели и менеджеров
+        # 2.  Инициализация модели и менеджеров
         self.tree_model_manager = TreeModelManager()  # Подключаем менеджер
         self.tree_model_manager.delete_manager.removal_complete.connect(self._handle_removal_result)
 
+        #3. # Инициализация наблюдателя
+        self.file_watcher = QFileSystemWatcher()
+        self.file_watcher.fileChanged.connect(self._on_file_changed)  # Подключение сигнала
 
-        # 2. Инициализация пользовательского интерфейса
+        self.content_viewer = MarkdownViewer()
+
+        # 4. Инициализация пользовательского интерфейса
         self._init_ui()
 
 
@@ -166,15 +171,90 @@ class SidePanel(QWidget):
         """Обработчик сигнала о создании файла"""
         try:
             if file_path.endswith('.st'):
-                self.tree_model.add_file(file_path)
+                self.tree_model_manager.tree_model.add_file(file_path)
             elif file_path.endswith('.md'):
-                self.tree_model.add_markdown_file(file_path)
-            self._save_files_to_json()
-            self.tree_view.expandAll()
+                self.tree_model_manager.tree_model.add_markdown_file(file_path)
+            self.tree_model_manager.file_manager.save_files_to_json()
+            self.tree_view.expandAll()  # зменить код
         except Exception as e:
             print(f"Ошибка при добавлении файла в дерево: {e}")
             # Можно добавить QMessageBox для показа ошибки пользователю
             QMessageBox.warning(self, "Ошибка", f"Не удалось добавить файл в дерево: {str(e)}")
+
+    def _on_tree_item_clicked(self, index):
+        """Обработка клика по элементу дерева"""
+        """
+              Кратко по логике метода:
+              Метод вызывается при клике по элементу в дереве.
+              Получает соответствующий объект и очищает содержимое просмотра.
+              В зависимости от типа элемента (template, file, markdown) разным образом обрабатывает содержимое:
+                  Для template — показывает текст шаблона.
+                  Для file — читает файл, отображает его как текст.
+                  Для markdown — читает файл, отображает его как markdown.
+                  Для файлов (file и markdown) настраивает наблюдение за изменениями файла через file_watcher.
+        """
+        item = index.internalPointer()      # Получаем объект элемента дерева из индекса
+        if not item:                        # Если элемент отсутствует, выходим из метода
+            return
+
+        # Очищаем предыдущее содержимое
+        self.content_viewer.set_content("")  # используем метод MarkdownViewer
+
+        # Обработка разных типов элементов
+        if item.item_data[1] == 'template':  # Если элемент — шаблон
+
+            self.content_viewer.set_content(item.item_data[2])  # Устанавливаем содержимое шаблона
+            self.content_viewer.set_view_mode("text") # <-- Устанавливаем текстовый режим для шаблонов
+
+        elif item.item_data[1] == 'file':  # <-- Обработка ST файлов
+            file_path = item.item_data[2]  # Получаем путь к файлу
+            try:
+                if os.path.exists(file_path): # Проверяем, существует ли файл
+                    with open(file_path, 'r', encoding='utf-8') as f: # Открываем файл для чтения
+                        content = f.read()      # Читаем содержимое файла
+                        self.content_viewer.set_content(content) # Отправляем содержимое на просмотр
+                        self.content_viewer.set_view_mode("text")  # <-- Устанавливаем текстовый режим для ST файлов
+                else:
+                    self.content_viewer.set_content(f"Файл не найден: {file_path}")  # Сообщаем, что файл не найден
+            except Exception as e:
+                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")  # Сообщаем об ошибке загрузки
+
+
+        elif item.item_data[1] == 'markdown':        # Если элемент — markdown файл
+            file_path = item.item_data[2]            # Получаем путь к файлу
+            try:
+                if os.path.exists(file_path):        # Проверяем, существует ли файл
+                    with open(file_path, 'r', encoding='utf-8') as f:  # Открываем файл для чтения
+                        content = f.read()  # Читаем содержимое файла
+                        #self.content_view.setMarkdown(content)
+                        self.content_viewer.set_content(content) # Отправляем содержимое на просмотр
+                        self.content_viewer.set_view_mode("markdown")  # <-- Устанавливаем markdown режим для MD файлов
+                else:
+                    #self.content_view.setPlainText(f"Файл не найден: {file_path}")
+                    self.content_viewer.set_content(f"Файл не найден: {file_path}")  # Сообщаем, что файл не найден
+            except Exception as e:
+                #self.content_view.setPlainText(f"Ошибка загрузки файла: {str(e)}")
+                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")  # Сообщаем об ошибке загрузки
+
+        # Для файлов добавляем в наблюдатель
+        if item.item_data[1] in ['file', 'markdown']:   # Если выбран файл или markdown, добавляем в FileWatcher
+            file_path = item.item_data[2]               # Получаем путь к файлу
+            self.current_file = file_path               # Сохраняем путь к текущему файлу
+            self.signals.file_selected.emit(file_path)  # Отправляем сигнал о выборе файла
+
+            # Обновляем наблюдатель файлов (удаляем старые файлы из наблюдения и добавляем текущий)
+            if self.file_watcher.files():  # Если есть отслеживаемые файлы
+                self.file_watcher.removePaths(self.file_watcher.files()) # Удаляем их из наблюдения
+            self.file_watcher.addPath(file_path)  # Добавляем текущий файл в наблюдение
+
+    # Обработчик изменения файла
+    def _on_file_changed(self, path):
+        """Обработка изменения файла"""
+        # Метод реагирует на изменение файла, принимает путь к изменённому файлу
+        # Если измененный файл - текущий выбранный файл
+        if path == self.current_file:  # Проверяет, совпадает ли изменённый файл с текущим выбранным файлом
+            # Если да, то отправляет сигнал file_changed с путем к изменённому файлу
+            self.signals.file_changed.emit(path)
 
 if __name__ == "__main__":
     # Создаем экземпляр приложения

@@ -64,64 +64,6 @@ class TreeManager:
             if model.is_folder(child_index):
                 self.collapse_recursive(child_index) # Рекурсивный вызов для папок
 
-    def _on_tree_item_clicked(self, index):
-        """Обработка клика по элементу дерева"""
-        item = index.internalPointer()
-        if not item:
-            return
-
-        # Очищаем предыдущее содержимое
-        #self.content_view.clear()
-
-        # Очищаем предыдущее содержимое
-        self.content_viewer.set_content("")  # используем метод MarkdownViewer
-
-        # Обработка разных типов элементов
-        if item.item_data[1] == 'template':
-            #self.content_view.setPlainText(item.item_data[2])
-            self.content_viewer.set_content(item.item_data[2])
-            self.content_viewer.set_view_mode("text") # <-- Устанавливаем текстовый режим для шаблонов
-
-        elif item.item_data[1] == 'file':  # <-- Обработка ST файлов
-            file_path = item.item_data[2]
-            try:
-                if os.path.exists(file_path):
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        self.content_viewer.set_content(content)
-                        self.content_viewer.set_view_mode("text")  # <-- Устанавливаем текстовый режим для ST файлов
-                else:
-                    self.content_viewer.set_content(f"Файл не найден: {file_path}")
-            except Exception as e:
-                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
-
-
-        elif item.item_data[1] == 'markdown':
-            file_path = item.item_data[2]
-            try:
-                if os.path.exists(file_path):
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        #self.content_view.setMarkdown(content)
-                        self.content_viewer.set_content(content)
-                        self.content_viewer.set_view_mode("markdown")  # <-- Устанавливаем markdown режим для MD файлов
-                else:
-                    #self.content_view.setPlainText(f"Файл не найден: {file_path}")
-                    self.content_viewer.set_content(f"Файл не найден: {file_path}")
-            except Exception as e:
-                #self.content_view.setPlainText(f"Ошибка загрузки файла: {str(e)}")
-                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
-
-        # Для файлов добавляем в наблюдатель
-        if item.item_data[1] in ['file', 'markdown']:
-            file_path = item.item_data[2]
-            self.current_file = file_path
-            self.signals.file_selected.emit(file_path)
-
-            # Обновляем наблюдатель файлов
-            if self.file_watcher.files():
-                self.file_watcher.removePaths(self.file_watcher.files())
-            self.file_watcher.addPath(file_path)
     def _on_item_double_clicked(self, index):
         """
         Обработчик двойного клика по элементу дерева.
@@ -149,8 +91,3 @@ class TreeManager:
         item = parent.internalPointer()
         return len(item.child_items) > 0
 
-    def _on_tree_item_clicked_Определить_Нужен_Метод(self, index):
-        """Обработка клика по элементу дерева"""
-        item = index.internalPointer()
-        if not item:
-            return
