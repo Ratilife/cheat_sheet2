@@ -42,3 +42,16 @@ class FileWatcher(QObject):
         else:
             # Если путь не существует (файл был удалён), генерирует (вызывает) сигнал/событие о том, что файл был удалён
             self.file_deleted.emit(path)
+
+    def get_watched_files(self) -> list:
+        """Возвращает список отслеживаемых файлов"""
+        return self.watcher.files()
+
+    def clear_watched_files(self) -> None:
+        """Очищает список отслеживаемых файлов"""
+        if self.watcher.files():
+            self.watcher.removePaths(self.watcher.files())
+
+    def watch_file(self, path: str) -> bool:
+        """Добавляет файл для отслеживания"""
+        return self.add_path(path)  # Используем уже существующий метод

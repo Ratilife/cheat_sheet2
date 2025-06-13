@@ -184,71 +184,53 @@ class SidePanel(QWidget):
             QMessageBox.warning(self, "Ошибка", f"Не удалось добавить файл в дерево: {str(e)}")
 
     def _on_tree_item_clicked(self, index):
-        """Обработка клика по элементу дерева"""
-        """
-              Кратко по логике метода:
-              Метод вызывается при клике по элементу в дереве.
-              Получает соответствующий объект и очищает содержимое просмотра.
-              В зависимости от типа элемента (template, file, markdown) разным образом обрабатывает содержимое:
-                  Для template — показывает текст шаблона.
-                  Для file — читает файл, отображает его как текст.
-                  Для markdown — читает файл, отображает его как markdown.
-                  Для файлов (file и markdown) настраивает наблюдение за изменениями файла через file_watcher.
-        """
-        item = index.internalPointer()      # Получаем объект элемента дерева из индекса
-        if not item:                        # Если элемент отсутствует, выходим из метода
+        """Обработка клика по элементу дерева с корректной работой FileWatcher"""
+        item = index.internalPointer()
+        if not item:
             return
 
         # Очищаем предыдущее содержимое
-        self.content_viewer.set_content("")  # используем метод MarkdownViewer
+        self.content_viewer.set_content("")
 
         # Обработка разных типов элементов
-        if item.item_data[1] == 'template':  # Если элемент — шаблон
+        item_type = item.item_data[1]
+        item_content = item.item_data[2]
 
-            self.content_viewer.set_content(item.item_data[2])  # Устанавливаем содержимое шаблона
-            self.content_viewer.set_view_mode("text") # <-- Устанавливаем текстовый режим для шаблонов
+        if item_type == 'template':
+            self.content_viewer.set_content(item_content)
+            self.content_viewer.set_view_mode("text")
 
-        elif item.item_data[1] == 'file':  # <-- Обработка ST файлов
-            file_path = item.item_data[2]  # Получаем путь к файлу
-            try:
-                if os.path.exists(file_path): # Проверяем, существует ли файл
-                    with open(file_path, 'r', encoding='utf-8') as f: # Открываем файл для чтения
-                        content = f.read()      # Читаем содержимое файла
-                        self.content_viewer.set_content(content) # Отправляем содержимое на просмотр
-                        self.content_viewer.set_view_mode("text")  # <-- Устанавливаем текстовый режим для ST файлов
-                else:
-                    self.content_viewer.set_content(f"Файл не найден: {file_path}")  # Сообщаем, что файл не найден
-            except Exception as e:
-                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")  # Сообщаем об ошибке загрузки
+        elif item_type in ['file', 'markdown']:
+            file_path = item_content
+            self.current_file = file_path
+            self.signals.file_selected.emit(file_path)
+
+            # Обновляем FileWatcher
+            self._update_file_watcher(file_path)
+
+            # Загружаем содержимое файла
+            self._update_file_content(file_path, item_type)
+
+    def _update_file_watcher(self, file_path):
+        """Обновляет отслеживаемые файлы в FileWatcher"""
+        # Удаляем все текущие пути (если есть)
+        self.file_watcher.clear_watched_files()  # Очищаем наблюдаемые файлы
+        self.file_watcher.watch_file(file_path)  # Добавляем новый файл
 
 
-        elif item.item_data[1] == 'markdown':        # Если элемент — markdown файл
-            file_path = item.item_data[2]            # Получаем путь к файлу
-            try:
-                if os.path.exists(file_path):        # Проверяем, существует ли файл
-                    with open(file_path, 'r', encoding='utf-8') as f:  # Открываем файл для чтения
-                        content = f.read()  # Читаем содержимое файла
-                        #self.content_view.setMarkdown(content)
-                        self.content_viewer.set_content(content) # Отправляем содержимое на просмотр
-                        self.content_viewer.set_view_mode("markdown")  # <-- Устанавливаем markdown режим для MD файлов
-                else:
-                    #self.content_view.setPlainText(f"Файл не найден: {file_path}")
-                    self.content_viewer.set_content(f"Файл не найден: {file_path}")  # Сообщаем, что файл не найден
-            except Exception as e:
-                #self.content_view.setPlainText(f"Ошибка загрузки файла: {str(e)}")
-                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")  # Сообщаем об ошибке загрузки
-
-        # Для файлов добавляем в наблюдатель
-        if item.item_data[1] in ['file', 'markdown']:   # Если выбран файл или markdown, добавляем в FileWatcher
-            file_path = item.item_data[2]               # Получаем путь к файлу
-            self.current_file = file_path               # Сохраняем путь к текущему файлу
-            self.signals.file_selected.emit(file_path)  # Отправляем сигнал о выборе файла
-
-            # Обновляем наблюдатель файлов (удаляем старые файлы из наблюдения и добавляем текущий)
-            if self.file_watcher.files():  # Если есть отслеживаемые файлы
-                self.file_watcher.removePaths(self.file_watcher.files()) # Удаляем их из наблюдения
-            self.file_watcher.addPath(file_path)  # Добавляем текущий файл в наблюдение
-
+    def _update_file_content(self, file_path, file_type):
+        """Загружает и отображает содержимое файла с учетом его типа"""
+        try:
+            if os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    self.content_viewer.set_content(content)
+                    # Устанавливаем режим просмотра в зависимости от типа файла
+                    self.content_viewer.set_view_mode("text" if file_type == 'file' else "markdown")
+            else:
+                self.content_viewer.set_content(f"Файл не найден: {file_path}")
+        except Exception as e:
+            self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
     def _on_file_updated(self, path):
         """Обработчик обновления файла."""
         if path == self.current_file:
@@ -267,14 +249,6 @@ class SidePanel(QWidget):
             self.content_viewer.set_content(f"Файл удалён: {path}")
             # Дополнительные действия, например, убрать файл из tree_view
 
-    def _update_file_content(self, file_path):
-        """Загружает содержимое файла и отображает его."""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                self.content_viewer.set_content(content)
-        except Exception as e:
-            self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
 
 if __name__ == "__main__":
     # Создаем экземпляр приложения
