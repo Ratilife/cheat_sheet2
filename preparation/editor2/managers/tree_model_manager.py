@@ -33,6 +33,7 @@ class TreeModelManager:
         Добавляет файл в модель. Автоматически определяет тип (.st или .md).
         Возвращает True при успехе.
         """
+
         try:
             if file_path.endswith('.st'):
                 result = self.st_parser.parse_st_file(file_path)
