@@ -267,6 +267,15 @@ class SidePanel(QWidget):
             self.content_viewer.set_content(f"Файл удалён: {path}")
             # Дополнительные действия, например, убрать файл из tree_view
 
+    def _update_file_content(self, file_path):
+        """Загружает содержимое файла и отображает его."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                self.content_viewer.set_content(content)
+        except Exception as e:
+            self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
+
 if __name__ == "__main__":
     # Создаем экземпляр приложения
     app = QApplication(sys.argv)
