@@ -12,6 +12,7 @@ from preparation.editor2.widgets.delegates import TreeItemDelegate
 from preparation.editor2.utils.tree_manager import TreeManager
 from preparation.editor2.managers.tree_model_manager import TreeModelManager
 from preparation.editor2.widgets.markdown_viewer import MarkdownViewer
+from preparation.editor2.managers.file_watcher import FileWatcher
 
 # Класс для обработки сигналов панели
 class SidePanelSignals(QObject):
@@ -36,8 +37,9 @@ class SidePanel(QWidget):
         self.tree_model_manager.delete_manager.removal_complete.connect(self._handle_removal_result)
 
         #3. # Инициализация наблюдателя
-        self.file_watcher = QFileSystemWatcher()
-        self.file_watcher.fileChanged.connect(self._on_file_changed)  # Подключение сигнала
+        self.file_watcher = FileWatcher()
+        self.file_watcher.file_updated.connect(self._on_file_updated)
+        self.file_watcher.file_deleted.connect(self._on_file_deleted)
 
         self.content_viewer = MarkdownViewer()
 
@@ -247,14 +249,23 @@ class SidePanel(QWidget):
                 self.file_watcher.removePaths(self.file_watcher.files()) # Удаляем их из наблюдения
             self.file_watcher.addPath(file_path)  # Добавляем текущий файл в наблюдение
 
-    # Обработчик изменения файла
-    def _on_file_changed(self, path):
-        """Обработка изменения файла"""
-        # Метод реагирует на изменение файла, принимает путь к изменённому файлу
-        # Если измененный файл - текущий выбранный файл
-        if path == self.current_file:  # Проверяет, совпадает ли изменённый файл с текущим выбранным файлом
-            # Если да, то отправляет сигнал file_changed с путем к изменённому файлу
-            self.signals.file_changed.emit(path)
+    def _on_file_updated(self, path):
+        """Обработчик обновления файла."""
+        if path == self.current_file:
+            self.signals.file_changed.emit(path)  # Уведомляем о изменении
+            # Можно также обновить содержимое просмотра:
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    self.content_viewer.set_content(content)
+            except Exception as e:
+                self.content_viewer.set_content(f"Ошибка загрузки файла: {str(e)}")
+
+    def _on_file_deleted(self, path):
+        """Обработчик удаления файла."""
+        if path == self.current_file:
+            self.content_viewer.set_content(f"Файл удалён: {path}")
+            # Дополнительные действия, например, убрать файл из tree_view
 
 if __name__ == "__main__":
     # Создаем экземпляр приложения
