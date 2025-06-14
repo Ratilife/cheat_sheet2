@@ -1,18 +1,15 @@
 import sys
 import os
-import json
-from PySide6.QtWidgets import (QSplitter, QTreeView, QWidget,
+from PySide6.QtWidgets import (QTreeView, QWidget,
                                QVBoxLayout, QApplication, QMenu,
-                               QHBoxLayout, QPushButton, QSpacerItem, QSizePolicy, QFileDialog, QMessageBox)
-from PySide6.QtCore import (Qt, QFileSystemWatcher, Signal, QObject, QRect, QSize,
-                             QModelIndex)
-from PySide6.QtGui import QAction,  QColor, QCursor, QPen, QPainter
+                               QMessageBox)
+from PySide6.QtCore import Qt, Signal, QObject, QRect, QSize
+from PySide6.QtGui import QAction
 from preparation.editor2.ui.file_editor import FileEditorWindow
-from preparation.editor2.widgets.delegates import TreeItemDelegate
-from preparation.editor2.utils.tree_manager import TreeManager
 from preparation.editor2.managers.tree_model_manager import TreeModelManager
 from preparation.editor2.widgets.markdown_viewer import MarkdownViewer
 from preparation.editor2.managers.file_watcher import FileWatcher
+
 
 # Класс для обработки сигналов панели
 class SidePanelSignals(QObject):
@@ -46,9 +43,13 @@ class SidePanel(QWidget):
         # 4. Инициализация пользовательского интерфейса
         self._init_ui()
 
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.show()
 
     # 1. Инициализация и базовый UI
     def _init_ui(self):
+
+        self.ui_manager = UIManager()
         # Устанавливаем минимальную ширину панели
         self.setMinimumWidth(300)
 
@@ -57,10 +58,35 @@ class SidePanel(QWidget):
         # Убираем отступы у layout
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Панель заголовка
-        self.title_bar = QWidget()
-        title_layout = QHBoxLayout(self.title_bar)
-        title_layout.setContentsMargins(5, 2, 5, 2)
+        # Создаем дерево для отображения файловой системы
+        self.tree_view = QTreeView()
+        # Показываем заголовки у дерева
+        self.tree_view.setHeaderHidden(False)
+        self.tree_view.setIndentation(10)  # Увеличьте это значение
+        self.tree_view.setAnimated(True)  # Анимация раскрытия
+        self.tree_view.setUniformRowHeights(True)
+        self.tree_view.setRootIsDecorated(True)  # Показываем декор для корневых элементов
+        self.tree_view.setExpandsOnDoubleClick(True)  # Включаем разворачивание по двойному клику
+        self.tree_view.setSortingEnabled(False)
+        #---Тут изменить-----
+        #Оформляем горизонтальную панель над деревом с кнопками
+        # Кнопки для панели над деревом
+        self.ui_manager.create_button()
+        self.ui_manager.create_button()
+        self.ui_manager.create_button()
+        self.ui_manager.create_button()
+
+        # Горизонтальная панель над деревом
+        btn_panel = self.ui_manager.create_horizontal_panel(
+            "tree_controls",
+            ["add_file", "add_folder"]
+        )
+        # ---Конец Тут изменить-----
+        # Добавляем панель кнопок над деревом
+        main_layout.addWidget(btn_panel)
+        # Добавляем само дерево файлов
+        main_layout.addWidget(self.tree_view)
+
 
     # 2. Позиционирование/размеры
     # Метод настройки прикрепления к краям экрана
