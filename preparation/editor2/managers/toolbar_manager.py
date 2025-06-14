@@ -188,7 +188,6 @@ class ToolbarManager:
         self._above_tree_toolbar_editor = self.ui.create_toolbar(
             name="above_tree_toolbar_editor",
             buttons=["new_st_btn", "new_md_btn", "new_folder_btn", "new_template_btn", "new_save_as_btn"],
-
         )
 
         self._editor_toolbar = self.ui.create_toolbar(
