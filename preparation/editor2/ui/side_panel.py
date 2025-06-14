@@ -9,6 +9,8 @@ from preparation.editor2.ui.file_editor import FileEditorWindow
 from preparation.editor2.managers.tree_model_manager import TreeModelManager
 from preparation.editor2.widgets.markdown_viewer import MarkdownViewer
 from preparation.editor2.managers.file_watcher import FileWatcher
+from preparation.editor2.managers.toolbar_manager import ToolbarManager
+from preparation.editor2.managers.ui_manager import UIManager
 
 
 # Класс для обработки сигналов панели
@@ -48,8 +50,8 @@ class SidePanel(QWidget):
 
     # 1. Инициализация и базовый UI
     def _init_ui(self):
-
-        self.ui_manager = UIManager()
+        self.ui = UIManager()
+        self.toolbar_manager = ToolbarManager()
         # Устанавливаем минимальную ширину панели
         self.setMinimumWidth(300)
 
@@ -57,6 +59,15 @@ class SidePanel(QWidget):
         main_layout = QVBoxLayout(self)
         # Убираем отступы у layout
         main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Создаем панель заголовка с кнопками управления
+        title_layout = self.toolbar_manager.get_title_layout()
+
+        # Создаем разделитель с вертикальной ориентацией
+        self.splitter = self.ui.create_splitter(Qt.Vertical,
+                                                sizes=[300, 100],
+                                                handle_width=5,
+                                                handle_style="QSplitter::handle { background: #ccc; }")
 
         # Создаем дерево для отображения файловой системы
         self.tree_view = QTreeView()
@@ -68,24 +79,19 @@ class SidePanel(QWidget):
         self.tree_view.setRootIsDecorated(True)  # Показываем декор для корневых элементов
         self.tree_view.setExpandsOnDoubleClick(True)  # Включаем разворачивание по двойному клику
         self.tree_view.setSortingEnabled(False)
-        #---Тут изменить-----
+
         #Оформляем горизонтальную панель над деревом с кнопками
-        # Кнопки для панели над деревом
-        self.ui_manager.create_button()
-        self.ui_manager.create_button()
-        self.ui_manager.create_button()
-        self.ui_manager.create_button()
+
 
         # Горизонтальная панель над деревом
-        btn_panel = self.ui_manager.create_horizontal_panel(
-            "tree_controls",
-            ["add_file", "add_folder"]
-        )
-        # ---Конец Тут изменить-----
+        #btn_panel = self.toolbar_manager.get_above_tree_toolbar()
+
         # Добавляем панель кнопок над деревом
-        main_layout.addWidget(btn_panel)
+        #main_layout.addWidget(btn_panel)
         # Добавляем само дерево файлов
         main_layout.addWidget(self.tree_view)
+
+        # Установка модели
 
 
     # 2. Позиционирование/размеры

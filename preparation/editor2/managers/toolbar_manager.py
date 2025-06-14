@@ -130,11 +130,11 @@ class ToolbarManager:
 
         # Кнопка Сохранить
         self.ui.create_button(
-            name="new_save_btn",
+            name="save_btn",
             text="💾",
             tooltip="Сохранить"
         )
-        self.ui.buttons["new_save_btn"].clicked.connect(self.save_file.emit)
+        self.ui.buttons["save_btn"].clicked.connect(self.save_file.emit)
 
         # Кнопка Сохранить как
         self.ui.create_button(
@@ -162,15 +162,15 @@ class ToolbarManager:
 
         # Кнопка Копировать редактор
         self.ui.create_button(
-            name="new_copy_btn",
+            name="copy_btn",
             text=QIcon.fromTheme("edit-copy"),
             tooltip="Копировать"
         )
-        self.ui.buttons["new_copy_btn"].clicked.connect(self.copy_action.emit)
+        self.ui.buttons["copy_btn"].clicked.connect(self.copy_action.emit)
 
         # Кнопка Вставить редактор
         self.ui.create_button(
-            name="new_paste_btn",
+            name="paste_btn",
             text=QIcon.fromTheme("edit-paste"),
             tooltip="Вставить"
         )
@@ -178,23 +178,32 @@ class ToolbarManager:
 
     def _setup_toolbars(self):
         """Создает панели инструментов."""
-        self.above_tree_toolbar = self.ui.create_toolbar(
-            name="above_tree_toolbar",
+        self._title_layout = self.ui.create_toolbar(
+            name="title_layout",
             buttons=["collapse_btn", "expand_btn", "load_btn", "edit_btn",
+                     "spacer",
                      "collapse_panel_btn", "close_panel_btn"]
         )
 
-        self.above_tree_toolbar_editor = self.ui.create_toolbar(
+        self._above_tree_toolbar_editor = self.ui.create_toolbar(
             name="above_tree_toolbar_editor",
-            buttons=["new_st_btn", "new_md_btn", "new_folder_btn", "new_template_btn", "new_save_as_btn"]
+            buttons=["new_st_btn", "new_md_btn", "new_folder_btn", "new_template_btn", "new_save_as_btn"],
+
         )
 
-    def get_above_tree_toolbar(self):
-        return self.above_tree_toolbar
+        self._editor_toolbar = self.ui.create_toolbar(
+            name="editor_toolbar",
+            buttons=["cut_btn", "copy_btn", "delete_btn", "paste_btn", "save_btn"]
+        )
+
+
+
+
+    def get_title_layout(self):
+        return self._title_layout
 
     def get_above_tree_toolbar_editor(self):
-        return self.above_tree_toolbar_editor
+        return self._above_tree_toolbar_editor
 
-
-
-
+    def get_editor_toolbar(self):
+        return self._editor_toolbar
