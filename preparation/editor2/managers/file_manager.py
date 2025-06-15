@@ -69,21 +69,12 @@ class FileManager:
         """Возвращает путь к файлу сохранения"""
         return os.path.join(os.path.dirname(__file__), "saved_files.json")
 
-    def _load_st_files(self):
-        """Загрузка ST-файлов через диалог"""
-        files, _ = QFileDialog.getOpenFileNames(
-            self,  "Открыть файлы", "", "ST Files (*.st);;Markdown Files (*.md)"
+    def load_st_md_files(self):
+        """Загрузка ST-файлов, MD-файлов через диалог"""
+        files, _ = QFileDialog.getOpenFileNames(None,
+              "Открыть файлы", "", "ST Files (*.st);;Markdown Files (*.md)"
         )
-        for file in files:
-            print(f"Загрузка файла: {file}")  # Логирование
-            if file.endswith('.st'):
-                self.tree_model.add_file(file)
-            elif file.endswith('.md'):
-                self.tree_model.add_markdown_file(file)
-            self._save_files_to_json()
-
-        # Принудительное обновление вида
-        self.tree_view.expandAll()
+        return files
 
     def _new_file(self, extension):
         """

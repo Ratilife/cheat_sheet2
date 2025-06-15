@@ -2,6 +2,8 @@ import os
 from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtWidgets import (QMenu, QMessageBox, QFileDialog, QInputDialog)
 from PySide6.QtGui import QAction
+
+from preparation.editor2.managers import file_manager
 from preparation.editor2.models.st_file_tree_model import STFileTreeModel
 from preparation.editor2.parsers.st_file_parser import STFileParserWrapper
 from preparation.editor2.parsers.md_file_parser import MarkdownListener
@@ -93,6 +95,17 @@ class TreeModelManager:
         if self.current_file == file_path:
             self.markdown_viewer.set_content("")
             self.current_file = None
+
+    def load_st_md_files(self):
+        files = self.file_manager.load_st_md_files()
+        for file in files:
+            print(f"Загрузка файла: {file}")  # Логирование
+            if file.endswith('.st'):
+                self.tree_model.add_file(file)
+            elif file.endswith('.md'):
+                self.tree_model.add_markdown_file(file)
+        self.file_manager.save_files_to_json()
+        # Принудительное обновление вида
 
     def _show_tree_context_menu(self, pos):
         """Показывает контекстное меню для дерева файлов

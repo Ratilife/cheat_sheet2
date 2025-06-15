@@ -11,6 +11,8 @@ from preparation.editor2.widgets.markdown_viewer import MarkdownViewer
 from preparation.editor2.managers.file_watcher import FileWatcher
 from preparation.editor2.managers.toolbar_manager import ToolbarManager
 from preparation.editor2.managers.ui_manager import UIManager
+from preparation.editor2.widgets.delegates import TreeItemDelegate
+from preparation.editor2.utils.tree_manager import TreeManager
 
 
 # Класс для обработки сигналов панели
@@ -39,35 +41,22 @@ class SidePanel(QWidget):
         self.file_watcher = FileWatcher()
         self.file_watcher.file_updated.connect(self._on_file_updated)
         self.file_watcher.file_deleted.connect(self._on_file_deleted)
-
+        #нижняя панель (отображение данных)
         self.content_viewer = MarkdownViewer()
 
         # 4. Инициализация пользовательского интерфейса
         self._init_ui()
+
+        # Инициализация контекстного меню для управления позицией
+        self._init_position_menu()
+        # Настройка прикрепления к краям экрана
+        self._setup_screen_edge_docking()
 
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.show()
 
     # 1. Инициализация и базовый UI
     def _init_ui(self):
-        self.ui = UIManager()
-        self.toolbar_manager = ToolbarManager()
-        # Устанавливаем минимальную ширину панели
-        self.setMinimumWidth(300)
-
-        # Создаем основной вертикальный layout
-        main_layout = QVBoxLayout(self)
-        # Убираем отступы у layout
-        main_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Создаем панель заголовка с кнопками управления
-        title_layout = self.toolbar_manager.get_title_layout()
-
-        # Создаем разделитель с вертикальной ориентацией
-        self.splitter = self.ui.create_splitter(Qt.Vertical,
-                                                sizes=[300, 100],
-                                                handle_width=5,
-                                                handle_style="QSplitter::handle { background: #ccc; }")
 
         # Создаем дерево для отображения файловой системы
         self.tree_view = QTreeView()
@@ -80,18 +69,87 @@ class SidePanel(QWidget):
         self.tree_view.setExpandsOnDoubleClick(True)  # Включаем разворачивание по двойному клику
         self.tree_view.setSortingEnabled(False)
 
-        #Оформляем горизонтальную панель над деревом с кнопками
+        self.ui = UIManager()
+        self.tree_manager = TreeManager(self.tree_view)
+        self.toolbar_manager = ToolbarManager(self.tree_manager,self.close,self.showMinimized)
+        self.toolbar_manager.set_tree_model(self.tree_model_manager)
+
+        # Устанавливаем минимальную ширину панели
+        self.setMinimumWidth(300)
+
+        # Создаем основной вертикальный layout
+        main_layout = QVBoxLayout(self)
+        # Убираем отступы у layout
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Создаем панель заголовка с кнопками управления
+        title_layout = self.toolbar_manager.get_title_layout()
+        main_layout.addWidget(title_layout)  # Добавляем панель инструментов в основной layout(макет)
+
+        # Создаем разделитель с вертикальной ориентацией
+        self.splitter = self.ui.create_splitter(Qt.Vertical,
+                                                sizes=[300, 100],
+                                                handle_width=5,
+                                                handle_style="QSplitter::handle { background: #ccc; }")
 
 
-        # Горизонтальная панель над деревом
-        #btn_panel = self.toolbar_manager.get_above_tree_toolbar()
 
-        # Добавляем панель кнопок над деревом
-        #main_layout.addWidget(btn_panel)
+        # Устанавливаем делегат с правильной ссылкой на tree_view
+        self.delegate = TreeItemDelegate(self.tree_view)
+        self.tree_view.setItemDelegate(self.delegate)
+
+        # Подключаем обработчик двойного клика
+        #self.tree_view.doubleClicked.connect(self._on_tree_item_double_clicked)
+        self.tree_manager.setup_double_click_handler(self)
+
+        # Настройка стиля дерева
+        self.tree_view.setStyleSheet("""
+                    QTreeView {
+                        background-color: white;
+                        border: 1px solid #ddd;
+                    }
+                    QTreeView::item {
+                        padding: 2px;
+                        margin: 0px;
+                        height: 20px;
+                    }
+                    /* Убираем стандартные треугольники */
+                    QTreeView::branch {
+                        background: transparent;
+                        border: 0px;
+                    }
+                    QTreeView::branch:has-siblings:!adjoins-item {
+                        border-image: none;
+                        image: none;
+                    }
+                    QTreeView::branch:has-siblings:adjoins-item {
+                        border-image: none;
+                        image: none;
+                    }
+                    QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+                        border-image: none;
+                        image: none;
+                    }
+                    QTreeView::branch:has-children:!has-siblings:closed,
+                    QTreeView::branch:closed:has-children:has-siblings {
+                        border-image: none;
+                        image: none;
+                    }
+                    QTreeView::branch:open:has-children:!has-siblings,
+                    QTreeView::branch:open:has-children:has-siblings {
+                        border-image: none;
+                        image: none;
+                    }
+                """)
+
         # Добавляем само дерево файлов
         main_layout.addWidget(self.tree_view)
+        #Текстовое поле (нижняя часть)
+        self.splitter.addWidget(self.content_viewer)
+        #Добавляем разделитель в основной layout
+        main_layout.addWidget(self.splitter)
 
-        # Установка модели
+        # Настраиваем контекстное меню для дерева
 
 
     # 2. Позиционирование/размеры
@@ -179,7 +237,24 @@ class SidePanel(QWidget):
         self.update_dock_position()
         self._update_menu_checks()
 
-        # Метод обновления состояния пунктов меню
+        # Метод для включения свободного перемещения
+
+    def _enable_floating(self):
+        self.dock_position = "float"
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)  # <- ВКЛЮЧАЕМ поверх окон
+        self.show()
+        # self.update_dock_position()  # Обновляем геометрию
+        # Устанавливаем начальные размеры и позицию
+        screen = QApplication.primaryScreen().availableGeometry()
+        self.setGeometry(QRect(
+            screen.right() - 350,  # X координата (немного левее правого края)
+            screen.top() + 100,  # Y координата (немного ниже верхнего края)
+            300,  # Ширина
+            screen.height() - 200  # Высота (меньше высоты экрана)
+        ))
+        self._update_menu_checks()
+
+   # Метод обновления состояния пунктов меню
     def _update_menu_checks(self):
         self.pin_left_action.setChecked(self.dock_position == "left")
         self.pin_right_action.setChecked(self.dock_position == "right")
@@ -281,6 +356,10 @@ class SidePanel(QWidget):
             self.content_viewer.set_content(f"Файл удалён: {path}")
             # Дополнительные действия, например, убрать файл из tree_view
 
+    # Метод показа контекстного меню
+    def show_context_menu(self, pos):
+        # Показываем меню в указанной позиции
+        self.position_menu.exec(self.mapToGlobal(pos))
 
 if __name__ == "__main__":
     # Создаем экземпляр приложения

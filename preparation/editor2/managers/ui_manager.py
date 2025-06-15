@@ -1,13 +1,39 @@
+"""
+Модуль ui_manager предоставляет класс UIManager для управления пользовательским интерфейсом
+в приложениях на основе PySide6. Основные возможности:
+- Создание и управление кнопками с различными настройками
+- Создание панелей инструментов с гибкой конфигурацией
+- Организация горизонтальных панелей
+- Работа с разделителями интерфейса
+Модуль упрощает создание и управление элементами UI, обеспечивая единую точку управления.
+"""
 from PySide6.QtWidgets import QToolBar, QPushButton, QHBoxLayout, QWidget, QSplitter, QSizePolicy, QSpacerItem
 from PySide6.QtCore import Qt
 from typing import Union, List, Dict, Tuple
 
 class UIManager:
+    """
+        Класс для управления элементами пользовательского интерфейса.
+        Предоставляет методы для создания и настройки различных UI-компонентов:
+        - Кнопки (QPushButton)
+        - Панели инструментов (QToolBar)
+        - Горизонтальные панели (QWidget с QHBoxLayout)
+        - Разделители (QSplitter)
+
+        Все созданные элементы хранятся во внутренних словарях (buttons, panels)
+        для последующего доступа и управления.
+
+        Особенности:
+        - Поддержка гибкой настройки элементов (размеры, политики растяжения, отступы)
+        - Возможность добавления настраиваемых спейсеров
+        - Единый стиль оформления разделителей
+    """
     def __init__(self):
         self.buttons = {}
         self.panels = {}
 
-    def create_button(self, name, text, icon=None, tooltip="", fixed_width=None, fixed_height=None):
+    def create_button(self, name, text, icon=None,
+                      tooltip="", fixed_width=None, fixed_height=None):
         """Создает кнопку с настройками.
 
         Args:
@@ -32,9 +58,9 @@ class UIManager:
         return btn
 
     def create_toolbar(self,
-                  name: str,
-                  buttons: List[Union[str, Dict[str, Tuple[int, int, QSizePolicy.Policy, QSizePolicy.Policy]]]],
-                  margins: Tuple[int, int, int, int] = (5, 2, 5, 2)) -> QToolBar:
+                       name: str,
+                       buttons: List[Union[str, Dict[str, Tuple[int, int, QSizePolicy.Policy, QSizePolicy.Policy]]]],
+                       margins: Tuple[int, int, int, int] = (5, 2, 5, 2)) -> QToolBar:
         """Создает панель инструментов с кнопками и настраиваемыми спейсерами.
 
         Args:
@@ -42,25 +68,32 @@ class UIManager:
             buttons: Список элементов:
                 - строка с именем кнопки ("open_btn")
                 - словарь {"spacer": (width, height, hPolicy, vPolicy)}
+                - строка "separator" для простого разделителя
             margins: Отступы содержимого (left, top, right, bottom)
 
         Returns:
         Созданная панель инструментов
         """
         toolbar = QToolBar(name)
-        # Устанавливаем отступы
         toolbar.setContentsMargins(*margins)
-        # Добавляем кнопки
+
         for item in buttons:
             if isinstance(item, dict) and "spacer" in item:
-                # Настраиваемый спейсер
+                # Настраиваемый спейсер (создаем QWidget с QHBoxLayout)
                 width, height, h_policy, v_policy = item["spacer"]
-                spacer = QSpacerItem(width, height, h_policy, v_policy)
-                toolbar.addSpacerItem(spacer)
+                spacer_widget = QWidget()
+                spacer_widget.setSizePolicy(h_policy, v_policy)
+                if width > 0 and height > 0:
+                    spacer_widget.setFixedSize(width, height)
+                toolbar.addWidget(spacer_widget)
             elif item == "spacer":
                 # Спейсер по умолчанию
-                spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-                toolbar.addSpacerItem(spacer)
+                spacer_widget = QWidget()
+                spacer_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+                toolbar.addWidget(spacer_widget)
+            elif item == "separator":
+                # Простой разделитель
+                toolbar.addSeparator()
             elif item in self.buttons:
                 # Обычная кнопка
                 toolbar.addWidget(self.buttons[item])

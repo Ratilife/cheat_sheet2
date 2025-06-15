@@ -1,5 +1,10 @@
 import os
 from PySide6.QtCore import (QModelIndex)
+from typing import Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from preparation.editor2.ui.file_editor import FileEditorWindow  # Для аннотаций
+    from preparation.editor2.ui.side_panel import SidePanel
 class TreeManager:
     """
         Класс для управления деревом (разворачиванием/сворачиванием узлов).
@@ -64,16 +69,34 @@ class TreeManager:
             if model.is_folder(child_index):
                 self.collapse_recursive(child_index) # Рекурсивный вызов для папок
 
-    def _on_item_double_clicked(self, index):
-        """
-        Обработчик двойного клика по элементу дерева.
-        Должен загружать содержимое элемента в текстовый редактор.
+    def setup_double_click_handler(self, context: Union["FileEditorWindow", "SidePanel"]) -> None:
+        """Подключает обработчик двойного клика к дереву."""
+        self.tree_view.doubleClicked.connect(
+            lambda idx: self._on_tree_item_double_clicked(idx, context)
+        )
 
-        Args:
-            index: Индекс элемента в дереве
+    def _on_tree_item_double_clicked(self, index: QModelIndex, context) -> None:
         """
-        # TODO: Реализовать загрузку содержимого
-        pass
+        Общий метод для обработки двойного клика.
+        context: объект FileEditorWindow или SidePanel, где есть:
+          - _load_file_content(file_path)
+          - text_editor
+          - current_file_path
+        """
+        if not index.isValid():
+            return
+
+        item = index.internalPointer()
+        if not item:
+            return
+
+        if item.item_data[1] in ['file', 'markdown']:
+            file_path = item.item_data[2]
+            context._load_file_content(file_path) # TODO изменить код взять из другого модуля
+        elif item.item_data[1] == 'template':
+            context.current_file_path = None   # TODO разобраться нужно менять или оставить как есть
+            context.text_editor.setPlainText(item.item_data[2])
+
     def _update_tree_view(self):
         """
         Обновление отображения дерева файлов.

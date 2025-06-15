@@ -11,8 +11,8 @@ def editor2():
     subprocess.run(
         ["python", r"F:\Языки\Python\Partfolio\cheat_sheet2\project\cheat_sheet2\preparation\editor2\ui\side_panel.py"])
 def run():
-    editor()
-    #editor2()
+    #editor()
+    editor2()
     #audit()
 
 
