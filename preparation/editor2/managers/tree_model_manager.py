@@ -19,23 +19,23 @@ class TreeModelManager:
     """
 
     def __init__(self):
-        self.tree_model = STFileTreeModel()
-        self.st_parser = STFileParserWrapper()
-        self.md_parser = MarkdownListener()
+        self.tree_model = STFileTreeModel()     #TODO ?
+        self.st_parser = STFileParserWrapper()  #TODO выкинуть из модуля
+        self.md_parser = MarkdownListener()  #TODO выкинуть из модуля
         self.delete_manager = DeleteManager(self.tree_model, self.st_parser)
 
         # Добавляем FileManager
-        self.file_manager = FileManager()
+        self.file_manager = FileManager()  #TODO ?
         self.file_manager.tree_model = self.tree_model  # Передаем модель в FileManager
 
 
     # --- Методы для работы с данными ---
+    # TODO переписать метод add_file на add_item
     def add_file(self, file_path: str) -> bool:
         """
         Добавляет файл в модель. Автоматически определяет тип (.st или .md).
         Возвращает True при успехе.
         """
-
         try:
             if file_path.endswith('.st'):
                 result = self.st_parser.parse_st_file(file_path)
@@ -47,7 +47,7 @@ class TreeModelManager:
         except Exception as e:
             print(f"Ошибка добавления файла {file_path}: {str(e)}")
             return False
-
+    # TODO Переписать метод remove_item
     def remove_item(self, index: QModelIndex, delete_from_disk: bool = False) -> tuple[bool, str]:
         """
         Удаляет элемент через DeleteManager.
@@ -56,21 +56,6 @@ class TreeModelManager:
         return self.delete_manager.execute_removal(index, delete_from_disk)
 
     # --- Методы для доступа к данным ---
-    def get_item_type(self, index: QModelIndex) -> str:
-        """Возвращает тип элемента ('file', 'folder', 'markdown', etc.)."""
-        if not index.isValid():
-            return ""
-        return self.tree_model.get_item_type(index)
-
-    def get_item_path(self, index: QModelIndex) -> str | None:
-        """Возвращает путь к файлу (для 'file' и 'markdown'), иначе None."""
-        if self.get_item_type(index) not in ('file', 'markdown'):
-            return None
-        return self.tree_model.get_item_path(index)
-
-    def get_item_level(self, index: QModelIndex) -> int:
-        """Возвращает уровень вложенности элемента (0 для корня)."""
-        return self.tree_model.get_item_level(index)
 
     def set_tree_model(self, model):
         """Установка модели для дерева"""
@@ -107,6 +92,7 @@ class TreeModelManager:
         self.file_manager.save_files_to_json()
         # Принудительное обновление вида
 
+    # TODO выкинуть из модуля show_tree_context_menu
     def _show_tree_context_menu(self, pos):
         """Показывает контекстное меню для дерева файлов
             Args:
@@ -403,6 +389,7 @@ class TreeModelManager:
         # TODO: Реализовать через QStandardItemModel
         pass
 
+    # TODO выкинуть из модуля
     def _generate_st_content(self, structure):
         """
         Генерация содержимого ST файла согласно грамматике STFile.g4.
@@ -429,3 +416,55 @@ class TreeModelManager:
             f'{build_folder(root_folder)}\n'
             ']}'
         )
+
+
+    #-----Методы соответствуют функционалу модуля-----
+
+    def add_item(self, item_type: str, path: str, parent_index=None) -> bool:
+        """Добавляет элемент в дерево.
+        Args:
+            item_type: 'file', 'folder', 'markdown', 'template'
+            path: путь к файлу или имя папки/шаблона
+            parent_index: родительский индекс (None для корня)
+        Returns:
+            bool: True если добавление успешно
+        """
+        try:
+            if item_type == "file":
+                return self.tree_model.add_file(path)
+            elif item_type == "markdown":
+                return self.tree_model.add_markdown_file(path)
+            elif item_type == "folder":
+                # Реализация для папок
+                return self.tree_model.add_folder(path, parent_index) #TODO сделать метод
+            elif item_type == "template":
+                # Реализация для шаблонов
+                return self.tree_model.add_template(path, parent_index) #TODO сделать метод
+            return False
+        except Exception as e:
+            print(f"Ошибка добавления элемента {path}: {str(e)}")
+            return False
+
+    def remove_item_with_dialog(self, index: QModelIndex, delete_from_disk: bool) -> tuple[bool, str]:
+        """Удаляет элемент через DeleteManager (обёртка для удобства)."""
+        return self.delete_manager.execute_removal(index, delete_from_disk)
+
+    def remove_item(self, index: QModelIndex) -> bool:
+        """Удаляет элемент из модели (без удаления с диска)."""
+        return self.tree_model.removeRow(index.row(), index.parent())
+
+    def get_item_type(self, index: QModelIndex) -> str:
+        """Возвращает тип элемента ('file', 'folder', 'markdown', etc.)."""
+        if not index.isValid():
+            return ""
+        return self.tree_model.get_item_type(index)
+
+    def get_item_path(self, index: QModelIndex) -> str | None:
+        """Возвращает путь к файлу (для 'file' и 'markdown'), иначе None."""
+        if self.get_item_type(index) not in ('file', 'markdown'):
+            return None
+        return self.tree_model.get_item_path(index)
+
+    def get_item_level(self, index: QModelIndex) -> int:
+        """Возвращает уровень вложенности элемента (0 для корня)."""
+        return self.tree_model.get_item_level(index)

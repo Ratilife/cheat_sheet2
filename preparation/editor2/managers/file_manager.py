@@ -1,10 +1,15 @@
 import json
 import os
 from PySide6.QtWidgets import (QFileDialog, QMessageBox)
+from preparation.editor2.parsers.st_file_parser import STFileParserWrapper
+from preparation.editor2.parsers.md_file_parser import MarkdownListener
 class FileManager:
 
     def __init__(self):
         self.tree_model = None
+        self.st_parser = STFileParserWrapper()
+        self.md_parser = MarkdownListener()
+
     def save_files_to_json(self):
         """Сохраняет список загруженных файлов в JSON"""
         save_path = self._get_save_path()
@@ -264,3 +269,13 @@ class FileManager:
             raise Exception(f"Ошибка сохранения ST файла: {str(e)}")
         # Преобразование исходного исключения с добавлением контекста
         # Позволяет точнее идентифицировать источник ошибки
+
+    #---- Методы соответствуют функционалу модуля------
+
+    def parse_and_get_type(self, file_path: str) -> tuple[str, dict]:
+        """Определяет тип файла и парсит его содержимое"""
+        if file_path.endswith('.st'):
+            return "file", self.st_parser.parse_st_file(file_path)
+        elif file_path.endswith('.md'):
+            return "markdown", self.md_parser.parse_markdown_file(file_path)
+        raise ValueError("Unsupported file type")
