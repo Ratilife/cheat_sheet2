@@ -115,7 +115,7 @@ class STFileTreeModel(QAbstractItemModel):
             return ["Имя"][section]
         return None
 
-    def add_file(self, file_path):
+    def add_st_file(self, file_path):
         """Добавляет новый ST-файл в модель"""
         if any(item.item_data[2] == file_path for item in self.root_item.child_items):
             print(f"File {file_path} already exists in tree!")
@@ -169,7 +169,8 @@ class STFileTreeModel(QAbstractItemModel):
 
     def add_markdown_file(self, file_path):
         """Добавляет Markdown файл в модель"""
-        result = self.md_parser.parse_markdown_file(file_path)
+        #TODO переписать метод
+        result = self.md_parser.parse_markdown_file(file_path) # TODO изменить перенести в метод parse_and_get_type
 
         self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
 

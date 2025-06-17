@@ -29,31 +29,6 @@ class TreeModelManager:
         self.file_manager.tree_model = self.tree_model  # Передаем модель в FileManager
 
 
-    # --- Методы для работы с данными ---
-    # TODO переписать метод add_file на add_item
-    def add_file(self, file_path: str) -> bool:
-        """
-        Добавляет файл в модель. Автоматически определяет тип (.st или .md).
-        Возвращает True при успехе.
-        """
-        try:
-            if file_path.endswith('.st'):
-                result = self.st_parser.parse_st_file(file_path)
-                self.tree_model.add_file(file_path)
-            elif file_path.endswith('.md'):
-                result = self.md_parser.parse_markdown_file(file_path)
-                self.tree_model.add_markdown_file(file_path)
-            return True
-        except Exception as e:
-            print(f"Ошибка добавления файла {file_path}: {str(e)}")
-            return False
-    # TODO Переписать метод remove_item
-    def remove_item(self, index: QModelIndex, delete_from_disk: bool = False) -> tuple[bool, str]:
-        """
-        Удаляет элемент через DeleteManager.
-        Возвращает (success, message).
-        """
-        return self.delete_manager.execute_removal(index, delete_from_disk)
 
     # --- Методы для доступа к данным ---
 
@@ -63,122 +38,18 @@ class TreeModelManager:
         # Раскрываем все узлы дерева
         self.tree_view.expandAll()
 
-    def remove_file(self, file_path):
-        """Удаляет файл из дерева и из сохраненных данных"""
-        # Находим индекс файла
-        for i in range(len(self.tree_model.root_item.child_items)):
-            item = self.tree_model.root_item.child_items[i]
-            if item.item_data[2] == file_path:
-                index = self.tree_model.index(i, 0, QModelIndex())
-                self.tree_model.remove_item(index, False)  # Удаляем только из дерева
-                break
 
-        # Удаляем из сохраненных данных
-        self._remove_file_from_json(file_path)
-
-        # Если удаляемый файл был текущим, очищаем просмотр
-        if self.current_file == file_path:
-            self.markdown_viewer.set_content("")
-            self.current_file = None
 
     def load_st_md_files(self):
         files = self.file_manager.load_st_md_files()
         for file in files:
             print(f"Загрузка файла: {file}")  # Логирование
             if file.endswith('.st'):
-                self.tree_model.add_file(file)
+                self.tree_model.add_st_file(file)
             elif file.endswith('.md'):
                 self.tree_model.add_markdown_file(file)
         self.file_manager.save_files_to_json()
         # Принудительное обновление вида
-
-    # TODO выкинуть из модуля show_tree_context_menu
-    def _show_tree_context_menu(self, pos):
-        """Показывает контекстное меню для дерева файлов
-            Args:
-            pos: QPoint - позиция курсора мыши при вызове контекстного меню
-        """
-        # Получаем индекс элемента дерева по позиции клика
-        index = self.tree_view.indexAt(pos)
-        # Если индекс невалидный (клик мимо элементов), выходим из метода
-        if not index.isValid():
-            return
-
-        # Получаем объект элемента дерева по индексу
-        item = index.internalPointer()
-
-        # Создаем объект контекстного меню
-        menu = QMenu(self)
-
-        # Определяем тип элемента
-        item_type = item.item_data[1]
-
-        if item_type in ['file', 'markdown']:
-            # Для файлов создаем подменю с вариантами удаления
-            delete_menu = menu.addMenu("Удалить")
-
-            # Вариант 1: Удалить только из дерева
-            delete_from_tree = delete_menu.addAction("Удалить из дерева")
-            delete_from_tree.triggered.connect(
-                lambda: self.delete_manager.execute_removal(index, False)  # delete_from_disk=False
-            )
-
-            # Вариант 2: Удалить полностью (с диска)
-            delete_completely = delete_menu.addAction("Удалить полностью")
-            delete_completely.triggered.connect(
-                lambda: self.delete_manager.execute_removal(index, True)  # delete_from_disk=True
-            )
-        else:
-            # Для других элементов (папки, шаблоны) простое удаление
-            delete_action = menu.addAction("Удалить")
-            delete_action.triggered.connect(
-                lambda: self.delete_manager.execute_removal(index, False)
-                # Для не-файлов delete_from_disk не применяется
-            )
-
-            # Проверяем тип элемента (не является ли он файлом)
-        if item.item_data[1] != "file":
-            # Действие для удаления файла
-            remove_action = QAction("Удалить из списка", self)
-            # Подключаем обработчик удаления файла
-            remove_action.triggered.connect(
-                lambda: self.remove_file(item.item_data[2]))
-            # Добавляем действие в меню
-            menu.addAction(remove_action)
-        # Если элемент является папкой
-        elif item.item_data[1] == "folder":
-            # Действия для папок
-            expand_action = QAction("Развернуть", self)
-            # Подключаем обработчик разворачивания текущей папки
-            expand_action.triggered.connect(lambda: self.tree_view.expand(index))
-            # Добавляем действие в меню
-            menu.addAction(expand_action)
-
-            # Создаем действие "Свернуть"
-            collapse_action = QAction("Свернуть", self)
-            # Подключаем обработчик сворачивания текущей папки
-            collapse_action.triggered.connect(lambda: self.tree_view.collapse(index))
-            # Добавляем действие в меню
-            menu.addAction(collapse_action)
-
-            # Добавляем разделитель в меню
-            menu.addSeparator()
-
-            # Создаем действие "Развернуть все вложенные"
-            expand_all_action = QAction("Развернуть все вложенные", self)
-            # Подключаем обработчик рекурсивного разворачивания
-            expand_all_action.triggered.connect(lambda: self._expand_recursive(index))
-            # Добавляем действие в меню
-            menu.addAction(expand_all_action)
-
-            # Создаем действие "Свернуть все вложенные"
-            collapse_all_action = QAction("Свернуть все вложенные", self)
-            # Подключаем обработчик рекурсивного сворачивания
-            collapse_all_action.triggered.connect(lambda: self._collapse_recursive(index))
-            # Добавляем действие в меню
-            menu.addAction(collapse_all_action)
-        # Отображаем контекстное меню в позиции курсора
-        menu.exec(self.tree_view.viewport().mapToGlobal(pos))
 
     def _new_st_file(self):
         """
@@ -431,7 +302,7 @@ class TreeModelManager:
         """
         try:
             if item_type == "file":
-                return self.tree_model.add_file(path)
+                return self.tree_model.add_st_file(path)
             elif item_type == "markdown":
                 return self.tree_model.add_markdown_file(path)
             elif item_type == "folder":
@@ -445,10 +316,14 @@ class TreeModelManager:
             print(f"Ошибка добавления элемента {path}: {str(e)}")
             return False
 
+    # TODO - участвует в удалении
     def remove_item_with_dialog(self, index: QModelIndex, delete_from_disk: bool) -> tuple[bool, str]:
-        """Удаляет элемент через DeleteManager (обёртка для удобства)."""
+        """Удаляет элемент через DeleteManager (обёртка для удобства).
+        Возвращает (success, message).
+        """
         return self.delete_manager.execute_removal(index, delete_from_disk)
 
+    # TODO - участвует в удалении
     def remove_item(self, index: QModelIndex) -> bool:
         """Удаляет элемент из модели (без удаления с диска)."""
         return self.tree_model.removeRow(index.row(), index.parent())

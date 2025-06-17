@@ -43,7 +43,7 @@ class FileManager:
 
                     if os.path.exists(file_path):
                         if file_type == "file":
-                            self.tree_model.add_file(file_path)
+                            self.tree_model.add_st_file(file_path)
                         elif file_type == "markdown":
                             self.tree_model.add_markdown_file(file_path)  # Используем новый метод
 

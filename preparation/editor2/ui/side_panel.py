@@ -13,6 +13,7 @@ from preparation.editor2.managers.toolbar_manager import ToolbarManager
 from preparation.editor2.managers.ui_manager import UIManager
 from preparation.editor2.widgets.delegates import TreeItemDelegate
 from preparation.editor2.utils.tree_manager import TreeManager
+from preparation.editor2.operation.file_operations import FileOperations
 
 
 # Класс для обработки сигналов панели
@@ -34,13 +35,18 @@ class SidePanel(QWidget):
         self.signals = SidePanelSignals()
 
         # 2.  Инициализация модели и менеджеров
+        #TODO переписать сам tree_model_manager и обращение к нему
         self.tree_model_manager = TreeModelManager()  # Подключаем менеджер
         self.tree_model_manager.delete_manager.removal_complete.connect(self._handle_removal_result)
+        self.file_operations = FileOperations()
 
         #3. # Инициализация наблюдателя
         self.file_watcher = FileWatcher()
         self.file_watcher.file_updated.connect(self._on_file_updated)
         self.file_watcher.file_deleted.connect(self._on_file_deleted)
+
+
+
         #нижняя панель (отображение данных)
         self.content_viewer = MarkdownViewer()
 
@@ -276,15 +282,13 @@ class SidePanel(QWidget):
             self.editor_window.file_created.connect(self._on_file_created)
         self.editor_window.show()
 
+
     def _on_file_created(self, file_path):
         """Обработчик сигнала о создании файла"""
         try:
-            if file_path.endswith('.st'):
-                self.tree_model_manager.tree_model.add_file(file_path)
-            elif file_path.endswith('.md'):
-                self.tree_model_manager.tree_model.add_markdown_file(file_path)
-            self.tree_model_manager.file_manager.save_files_to_json()
-            self.tree_view.expandAll()  # зменить код
+            self.file_operations.add_file_to_tree(file_path)
+            self.tree_model_manager.file_manager.save_files_to_json() #TODO присмотрться
+            self.tree_view.expandAll()  # заменить код
         except Exception as e:
             print(f"Ошибка при добавлении файла в дерево: {e}")
             # Можно добавить QMessageBox для показа ошибки пользователю
