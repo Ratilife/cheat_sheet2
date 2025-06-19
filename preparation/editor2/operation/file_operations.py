@@ -34,4 +34,11 @@ class FileOperations:
     def create_and_add_md_file(self) -> tuple[bool, str]:
         """Полный цикл создания MD-файлов"""
         #TODO 🚧 В разработке: 19.06.2025 (нужно описать метод)
-        pass
+        path = self.file_manager.get_save_path("Создать MD файл", "Markdown Files (*.md)")
+        if not path:
+            return False, "Отменено пользователем"
+        try:
+            if self.file_manager.create_md_file(path):
+                return True, f"Файл {os.path.basename(path)} создан"
+        except Exception as e:
+            return False, str(e)
