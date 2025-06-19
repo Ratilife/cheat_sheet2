@@ -1,6 +1,8 @@
 # file_operations.py
+import os
 from preparation.editor2.managers.file_manager import FileManager
 from preparation.editor2.managers.tree_model_manager import TreeModelManager
+
 class FileOperations:
     def __init__(self, file_manager: FileManager, tree_model_manager: TreeModelManager):
         self.file_manager = file_manager
@@ -14,3 +16,22 @@ class FileOperations:
         except Exception as e:
             print(f"Ошибка добавления файла: {str(e)}")
             return False
+
+    def create_and_add_st_file(self) -> tuple[bool, str]:
+        """Полный цикл создания ST-файла"""
+        path = self.file_manager.get_save_path("Создать ST файл", "ST Files (*.st)")
+        if not path:
+            return False, "Отменено пользователем"
+
+        try:
+            if self.file_manager.create_st_file(path):
+                #TODO - tree_manager.add_item("file", path) какой тп элемента создает, нужно передать
+                self.tree_manager.add_item("file", path)
+                return True, f"Файл {os.path.basename(path)} создан"
+        except Exception as e:
+            return False, str(e)
+
+    def create_and_add_md_file(self) -> tuple[bool, str]:
+        """Полный цикл создания MD-файлов"""
+        #TODO 🚧 В разработке: 19.06.2025 (нужно описать метод)
+        pass

@@ -81,43 +81,9 @@ class FileManager:
         )
         return files
 
-    def _new_file(self, extension):
-        """
-        Создание нового файла
 
-        Args:
-            extension: Расширение файла ('st' или 'md')
-        """
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            f"Создать новый {extension.upper()} файл",
-            "",
-            f"{extension.upper()} Files (*.{extension})"
-        )
 
-        if file_path:
-            # Добавляем расширение, если его нет
-            if not file_path.endswith(f'.{extension}'):
-                file_path += f'.{extension}'
-
-            try:
-                # Создаем пустой файл
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write("")
-
-                # Добавляем в модель дерева
-                if extension == 'st':
-                    self.tree_model.add_file(file_path)
-                else:
-                    self.tree_model.add_markdown_file(file_path)
-
-                self.current_file_path = file_path
-                self.text_editor.clear()  # Очищаем редактор
-
-            except Exception as e:
-                QMessageBox.critical(self, "Ошибка", f"Не удалось создать файл: {str(e)}")
-
-    def _open_file(self):
+    def open_file(self):
         """Открытие существующего файла через диалог"""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -270,8 +236,6 @@ class FileManager:
         # Преобразование исходного исключения с добавлением контекста
         # Позволяет точнее идентифицировать источник ошибки
 
-    #---- Методы соответствуют функционалу модуля------
-
     def parse_and_get_type(self, file_path: str) -> tuple[str, dict]:
         """Определяет тип файла и парсит его содержимое"""
         if file_path.endswith('.st'):
@@ -279,3 +243,34 @@ class FileManager:
         elif file_path.endswith('.md'):
             return "markdown", self.md_parser.parse_markdown_file(file_path)
         raise ValueError("Unsupported file type")
+
+    # ---- Методы соответствуют функционалу модуля------
+    @staticmethod
+    def get_save_path(title: str, filter: str) -> str | None:
+        """Открывает диалог сохранения файла"""
+        # ✅ Реализовано: 19.06.2025
+        # filter = "Создать ST файл", "", "ST Files (*.st)"
+        path, _ = QFileDialog.getSaveFileName(None, title, "", filter)
+        return path
+
+    @staticmethod
+    def create_st_file(path: str) -> bool:
+        """Создает новый ST-файл с базовой структурой"""
+        # ✅ Реализовано: 19.06.2025
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                name = os.path.basename(path).replace('.st', '')
+                f.write(f"""{{1, {{"{name}", 1, 0, "", ""}}, []}}""")
+            return True
+        except Exception as e:
+            raise Exception(f"Ошибка создания ST-файла: {str(e)}")
+
+    @staticmethod
+    def create_md_file(path: str) -> bool:
+        """Создает новый MD-файл с базовым заголовком"""
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(f"# {os.path.basename(path).replace('.md', '')}\n\n")
+            return True
+        except Exception as e:
+            raise Exception(f"Ошибка создания MD-файла: {str(e)}")
