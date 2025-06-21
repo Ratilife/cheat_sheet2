@@ -14,10 +14,15 @@ class FileEditorWindow(QMainWindow):
         Обеспечивает создание, редактирование и сохранение файлов.
     """
 
-    def __init__(self):
-        # В методе _init_ui():
-        self.tree_view = QTreeView()
+    def __init__(self, parent=None):
 
+        super().__init__(parent)
+        self.tree_view = QTreeView()
+        self.parent_panel = parent  # Ссылка на родительскую панель
+        self.setWindowTitle("Редактор файлов")
+        self.setMinimumSize(600, 500)  # Минимальные размеры окна
+
+        # TODO NOTE - код нужно проверить на использование
         # 1. Делегат с кастомизацией (пример)
         delegate_config = {
             'indent': 25,  # Увеличенный отступ
@@ -29,9 +34,14 @@ class FileEditorWindow(QMainWindow):
         }
         self.delegate = TreeItemDelegate(parent=self.tree_view, config=delegate_config)  # ← Конфиг
         self.tree_view.setItemDelegate(self.delegate)
-
+        #------- код нужно проверить на использование
         # 2. Установка модели
         self.tree_view.setModel(self.tree_model)
+        self._init_ui()  # Инициализация интерфейса
+
+    def _init_ui(self):
+        """Инициализация пользовательского интерфейса"""
+
 
     def center_window(self):
         """Центрирует окно на экране"""
