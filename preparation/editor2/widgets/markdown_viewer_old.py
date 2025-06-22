@@ -1,4 +1,5 @@
-#TODO NOTE - этот модуль разбить на разный функционал или оставить прежним
+#TODO NOTE - этот модуль разбить на разные модули (этот модуль устарел)
+
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtWidgets import  QWidget,QVBoxLayout,QHBoxLayout, QButtonGroup, QRadioButton , QTextEdit
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont

@@ -5,10 +5,10 @@ from preparation.editor2.managers.tree_model_manager import TreeModelManager
 from preparation.editor2.managers.state_manager import FileStateManager
 
 class FileOperations:
-    def __init__(self, file_manager: FileManager, tree_model_manager: TreeModelManager, state_manager: FileStateManager):
-        self.file_manager = file_manager
+    def __init__(self, file_manager = None, tree_model_manager=None, state_manager = None):
+        self.file_manager = file_manager #TODO - FileManager Будет обьявлен сдесь
         self.tree_manager = tree_model_manager
-        self.state_manager = state_manager
+        self.state_manager = state_manager  #TODO - Будет заменен на наблюдателя
 
     def add_file_to_tree(self, file_path: str) -> bool:
         """Полный процесс добавления файла"""
@@ -30,7 +30,7 @@ class FileOperations:
                 #TODO - tree_manager.add_item("file", path) какой тп элемента создает, нужно передать
                 self.tree_manager.add_item("file", path)
                 # Обновление состояния
-                self.state_manager.set_current_file(path)
+                self.state_manager.set_current_file(path)  #TODO - Будет заменен на наблюдателя
                 return True, f"Файл {os.path.basename(path)} создан"
         except Exception as e:
             return False, str(e)

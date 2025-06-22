@@ -6,19 +6,25 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QIcon
 from preparation.editor2.widgets.delegates import TreeItemDelegate
+from preparation.editor2.observers.my_base_observer import MyBaseObserver
 
 
+class FileEditorWindowObserver(MyBaseObserver):
+    def __init__(self):
+        super().__init__()
 class FileEditorWindow(QMainWindow):
     """
         Главное окно редактора файлов с поддержкой форматов .st и .md.
         Обеспечивает создание, редактирование и сохранение файлов.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self): # TODO - убрать параметры toolbar_manager и parent
 
-        super().__init__(parent)
+        super().__init__()
         self.tree_view = QTreeView()
-        self.parent_panel = parent  # Ссылка на родительскую панель
+        #Создаем экземпляр класса для сигналов
+        self.observer = FileEditorWindowObserver()
+
         self.setWindowTitle("Редактор файлов")
         self.setMinimumSize(600, 500)  # Минимальные размеры окна
 
@@ -34,15 +40,112 @@ class FileEditorWindow(QMainWindow):
         }
         self.delegate = TreeItemDelegate(parent=self.tree_view, config=delegate_config)  # ← Конфиг
         self.tree_view.setItemDelegate(self.delegate)
-        #------- код нужно проверить на использование
-        # 2. Установка модели
-        self.tree_view.setModel(self.tree_model)
-        self._init_ui()  # Инициализация интерфейса
+        #self._init_ui()  # Инициализация интерфейса
+
 
     def _init_ui(self):
         """Инициализация пользовательского интерфейса"""
+        # Основной виджет и layout
+        main_widget = QWidget()                     # Создаем центральный виджет окна
+        self.setCentralWidget(main_widget)          # Устанавливаем его как центральный виджет окна
+        main_layout = QVBoxLayout(main_widget)      # Создаем вертикальный layout для основного виджета
+        main_layout.setContentsMargins(5, 5, 5, 5)  # Устанавливаем минимальные отступы layout
 
 
+        # Разделитель для дерева и редактора
+        self.splitter = QSplitter(Qt.Vertical)  # Вертикальный разделитель
+
+        # Текстовый редактор
+        self.text_editor = QTextEdit()  # Основной текстовый редактор для ST файлов
+        self.text_editor.setAcceptRichText(False)  # Режим plain text  Отключаем форматированный текст
+
+        #Создаем панель инструментов над деревом
+        toolbar_to_tree_layout = self.parent_toolbar.get_above_tree_toolbar_editor()
+        main_layout.addWidget(toolbar_to_tree_layout)
+        # Подключаем сигнал получения дерева
+        self.observer.file_selected.connect(self.receive_tree)
+
+        # Контейнер для редактора и кнопок
+        editor_container = QWidget()  # Контейнерный виджет
+        editor_layout = QVBoxLayout(editor_container)  # Вертикальный layout
+        editor_layout.setContentsMargins(0, 0, 0, 0)  # Без отступов
+        editor_layout.setSpacing(0)  # Без промежутков
+        # Создаем панель инструментов над редактаром
+        editor_toolbar = self.parent_toolbar.get_editor_toolbar()
+        # Добавляем кнопки над редактором
+        editor_layout.addWidget(editor_toolbar)
+        editor_layout.addWidget(self.text_editor)
+        #Добавляем разделтель
+        self.splitter.addWidget(self.tree_view)
+        self.splitter.addWidget(editor_container)
+        # Добавляем разделитель в основной layout
+        main_layout.addWidget(self.splitter)
+
+        # Подключаем сигналы дерева файлов
+        self.tree_view.doubleClicked.connect(self._on_tree_item_double_clicked)  #TODO - доработать
+
+        # Добавьте в метод _init_ui класса FileEditorWindow после создания tree_view:
+        self.tree_view.setHeaderHidden(False)  # Показываем заголовки
+        self.tree_view.setIndentation(10)  # Отступ для вложенных элементов
+        self.tree_view.setAnimated(True)  # Анимация раскрытия
+        self.tree_view.setUniformRowHeights(True)  # Одинаковая высота строк
+        self.tree_view.setRootIsDecorated(True)  # Показываем корневой элемент
+        self.tree_view.setExpandsOnDoubleClick(True)  # Раскрытие двойным кликом
+        self.tree_view.setSortingEnabled(False)  # Сортировка отключена
+
+        # Устанавливаем политику контекстного меню для tree_view на "CustomContextMenu",
+        # чтобы обработка вызова контекстного меню происходила вручную.
+        self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)  #TODO - доработать
+
+        # Подключаем сигнал customContextMenuRequested к методу _show_tree_context_menu,
+        # чтобы при вызове контекстного меню отобразить пользовательское меню.
+        self.tree_view.customContextMenuRequested.connect(self._show_tree_context_menu) #TODO - доработать
+
+        # Установите делегат (если он используется)
+        if hasattr(self.tree_model, 'delegate'):
+            # Создаем новый делегат на основе родительского, но для текущего tree_view
+            self.delegate = TreeItemDelegate(self.tree_view)
+            self.tree_view.setItemDelegate(self.delegate)
+
+        # Настройте стиль (можно скопировать из панели)
+        self.tree_view.setStyleSheet("""
+                    QTreeView {
+                        background-color: white;
+                        border: 1px solid #ddd;
+                    }
+                    QTreeView::item {
+                        padding: 2px;
+                        margin: 0px;
+                        height: 20px;
+                    }
+                    /* Убираем стандартные треугольники */
+                    QTreeView::branch {
+                        background: transparent;
+                        border: 0px;
+                    }
+                    QTreeView::branch:has-siblings:!adjoins-item {
+                        border-image: none;
+                        image: none;
+                    }
+                    QTreeView::branch:has-siblings:adjoins-item {
+                        border-image: none;
+                        image: none;
+                    }
+                    QTreeView::branch:!has-children:!has-siblings:adjoins-item {
+                        border-image: none;
+                        image: none;
+                    }
+                    QTreeView::branch:has-children:!has-siblings:closed,
+                    QTreeView::branch:closed:has-children:has-siblings {
+                        border-image: none;
+                        image: none;
+                    }
+                    QTreeView::branch:open:has-children:!has-siblings,
+                    QTreeView::branch:open:has-children:has-siblings {
+                        border-image: none;
+                        image: none;
+                    }
+                """)
     def center_window(self):
         """Центрирует окно на экране"""
         frame_geometry = self.frameGeometry()  # Получаем геометрию окна с учетом рамок
@@ -50,6 +153,16 @@ class FileEditorWindow(QMainWindow):
         frame_geometry.moveCenter(screen_center)  # Совмещаем центры
         self.move(frame_geometry.topLeft())  # Перемещаем окно
 
+    def receive_tree(self, tree_model, toolbar_manager):
+        """Получаем модель дерева и отображаем ее """
+        self.tree_model = tree_model
+        self.parent_toolbar = toolbar_manager
+        self._init_ui()
+        self.tree_view.setModel(self.tree_model)
+        self.parent_toolbar = toolbar_manager
+
+
+    #---- Нужно проверить методы -------
     def _on_tree_item_double_clicked(self, index):
         """
         Обработка двойного клика по элементу дерева

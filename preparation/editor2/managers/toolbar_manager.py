@@ -1,14 +1,20 @@
 """Что делает этот модуль?"""
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QToolBar, QPushButton, QButtonGroup
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QObject
 from preparation.editor2.managers.ui_manager import UIManager
 
 
 
-class ToolbarManager:
-    """Управление панелями инструментов с использованием UIManager."""
+class ToolbarManager(QObject):
+    """Управление панелями инструментов с использованием UIManager.
+       Класс ToolbarManager отвечает за создание и управление панелями инструментов редактора.
+       Он инкапсулирует логику генерации кнопок, панелей, а также связывания пользовательских действий с обработчиками.
+       Использует UIManager для шаблонного создания компонентов интерфейса, поддерживает динамическое подключение к TreeManager и модели дерева.
+       Реализует набор сигналов для интеграции с внешней логикой (например, сохранение, создание, удаление файлов, форматирование и др.).
+       Позволяет централизованно настраивать и изменять поведение панели инструментов редактора.
 
+    """
     # Сигналы для внешних обработчиков
     load_requested = Signal()  # Загрузка файлов
     editor_toggled = Signal(bool)  # Открытие/закрытие редактора
@@ -27,7 +33,9 @@ class ToolbarManager:
     copy_action = Signal()
     paste_action = Signal()
 
+
     def __init__(self,tree_manager=None, close=None, showMinimized = None ):
+        super().__init__()
         self.ui = UIManager()  # Создаем экземпляр UIManager
         self.tree_manager = tree_manager
         self.close = close
@@ -37,12 +45,14 @@ class ToolbarManager:
         self._setup_toolbars()
         self._connect_tree_manager()
 
+
     def _connect_tree_manager(self):
         """Подключает методы TreeManager к кнопкам."""
         if self.tree_manager:
             # Подключаем кнопки к методам TreeManager
             self.ui.buttons["collapse_btn"].clicked.connect(self.tree_manager.collapse_all)
             self.ui.buttons["expand_btn"].clicked.connect(self.tree_manager.expand_all)
+            self.ui.buttons["collapse_panel_btn"].clicked.connect(self.showMinimized)
     def _setup_buttons(self):
         """Создает кнопки и привязывает сигналы."""
         # Кнопка свернуть все
@@ -72,7 +82,7 @@ class ToolbarManager:
             fixed_width= 20,
             fixed_height=20
         )
-        self.ui.buttons["collapse_panel_btn"].clicked.connect(self.showMinimized)
+        #self.ui.buttons["collapse_panel_btn"].clicked.connect(self.showMinimized)
 
         # Кнопка закрыть панель
         self.ui.create_button(
@@ -93,7 +103,7 @@ class ToolbarManager:
             fixed_height=20
         )
         self.ui.buttons["edit_btn"].clicked.connect(
-            lambda: self.editor_toggled.emit(True)
+            lambda: self.editor_toggled.emit(True)  #TODO - нет подключения к этому сгналу
         )
         # Кнопка загрузить файл
         self.ui.create_button(
@@ -111,7 +121,7 @@ class ToolbarManager:
             text="📄",
             tooltip="Создать ST-файл"
         )
-        self.ui.buttons["new_st_btn"].clicked.connect(self.new_st_file)
+        self.ui.buttons["new_st_btn"].clicked.connect(lambda:self.new_st_file.emit())
 
         # Кнопка Создать md-файл
         self.ui.create_button(
@@ -119,7 +129,7 @@ class ToolbarManager:
             text="📝",
             tooltip="Создать MD-файл"
         )
-        self.ui.buttons["new_md_btn"].clicked.connect(self.new_md_file)
+        self.ui.buttons["new_md_btn"].clicked.connect(lambda:self.new_md_file.emit())
 
         # Кнопка Создать папку
         self.ui.create_button(
@@ -127,7 +137,7 @@ class ToolbarManager:
             text="📂",
             tooltip="Создать папку"
         )
-        self.ui.buttons["new_folder_btn"].clicked.connect(self.new_folder)
+        self.ui.buttons["new_folder_btn"].clicked.connect(lambda:self.new_folder.emit())
 
         # Кнопка Создать шаблон
         self.ui.create_button(
@@ -135,7 +145,7 @@ class ToolbarManager:
             text="🖼️",
             tooltip="Создать шаблон"
         )
-        self.ui.buttons["new_template_btn"].clicked.connect(self.new_template)
+        self.ui.buttons["new_template_btn"].clicked.connect(lambda:self.new_template.emit())
 
         # Кнопка Сохранить
         self.ui.create_button(
@@ -143,7 +153,7 @@ class ToolbarManager:
             text="💾",
             tooltip="Сохранить"
         )
-        self.ui.buttons["save_btn"].clicked.connect(self.save_file)
+        self.ui.buttons["save_btn"].clicked.connect(lambda:self.save_file.emit())
 
         # Кнопка Сохранить как
         self.ui.create_button(
@@ -151,7 +161,7 @@ class ToolbarManager:
             text="💽",
             tooltip="Сохранить как"
         )
-        self.ui.buttons["new_save_as_btn"].clicked.connect(self.save_file_as)
+        self.ui.buttons["new_save_as_btn"].clicked.connect(lambda:self.save_file_as.emit())
 
         # Кнопка Удалть редактор
         self.ui.create_button(
@@ -160,7 +170,7 @@ class ToolbarManager:
             text="",
             tooltip="Удалть"
         )
-        self.ui.buttons["delete_btn"].clicked.connect(self.delete_action)
+        self.ui.buttons["delete_btn"].clicked.connect(lambda:self.delete_action)
 
         # Кнопка Вырезать редактор
         self.ui.create_button(
@@ -169,7 +179,7 @@ class ToolbarManager:
             text="",
             tooltip="вырезать"
         )
-        self.ui.buttons["cut_btn"].clicked.connect(self.cut_action)
+        self.ui.buttons["cut_btn"].clicked.connect(lambda:self.cut_action.emit())
 
         # Кнопка Копировать редактор
         self.ui.create_button(
@@ -178,7 +188,7 @@ class ToolbarManager:
             text="",
             tooltip="Копировать"
         )
-        self.ui.buttons["copy_btn"].clicked.connect(self.copy_action)
+        self.ui.buttons["copy_btn"].clicked.connect(lambda:self.copy_action.emit())
 
         # Кнопка Вставить редактор
         self.ui.create_button(
@@ -187,22 +197,24 @@ class ToolbarManager:
             text="",
             tooltip="Вставить"
         )
-        self.ui.buttons["paste_btn"].clicked.connect(self.paste_action)
+        self.ui.buttons["paste_btn"].clicked.connect(lambda:self.paste_action.emit())
 
     def _setup_toolbars(self):
         """Создает панели инструментов."""
+        #панель над деревом файлов в модуле side_panel.py
         self._title_layout = self.ui.create_toolbar(
             name="title_layout",
             buttons=["collapse_btn", "expand_btn", "load_btn", "edit_btn",
                      "spacer",
                      "collapse_panel_btn", "close_panel_btn"]
         )
-
+        #панель над деревом файлов в модуле file_editor.py
         self._above_tree_toolbar_editor = self.ui.create_toolbar(
             name="above_tree_toolbar_editor",
             buttons=["new_st_btn", "new_md_btn", "new_folder_btn", "new_template_btn", "new_save_as_btn"],
         )
 
+        #панель над текстовым редактором в модуле file_editor.py
         self._editor_toolbar = self.ui.create_toolbar(
             name="editor_toolbar",
             buttons=["cut_btn", "copy_btn", "delete_btn", "paste_btn", "save_btn"]

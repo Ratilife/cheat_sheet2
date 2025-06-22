@@ -172,6 +172,7 @@ class TreeItemDelegate(QStyledItemDelegate):
         if event.type() == QEvent.MouseButtonRelease:
             if self._is_expand_button_clicked(event.pos(), option.rect):
                 model.toggle_expand(index)  # Делегируем менеджеру
+
     #TODO - проверить возможно нужно переделать
     def editorEvent_old(self, event, model, option, index):
         """
