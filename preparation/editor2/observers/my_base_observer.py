@@ -8,7 +8,11 @@ class MyBaseObserver(QObject):
     # Сигнал при изминении файла(передает путь к измененному файлу)
     file_changed = Signal(str)
     file_modified = Signal(str) #?
-    file_deleted = Signal(str)  #?
+    file_deleted = Signal(str) # Путь к удаленному файлу
+    # Сигналы для обновления дерева файлов в родительском окне
+    file_created = Signal(str)  # Путь к созданному файлу
+    file_saved = Signal(str)  # Путь к сохраненному файлу
+
 
 
     def __init__(self):

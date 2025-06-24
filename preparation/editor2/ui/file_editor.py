@@ -153,9 +153,9 @@ class FileEditorWindow(QMainWindow):
         frame_geometry.moveCenter(screen_center)  # Совмещаем центры
         self.move(frame_geometry.topLeft())  # Перемещаем окно
 
-    def receive_tree(self, tree_model, toolbar_manager):
+    def receive_tree(self, tree_model_manager, toolbar_manager):
         """Получаем модель дерева и отображаем ее """
-        self.tree_model = tree_model
+        self.tree_model = tree_model_manager.get_model()
         self.parent_toolbar = toolbar_manager
         self._init_ui()
         self.tree_view.setModel(self.tree_model)

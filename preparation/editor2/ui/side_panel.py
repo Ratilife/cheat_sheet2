@@ -376,7 +376,7 @@ class SidePanel(QWidget):
             self.editor_window = FileEditorWindow()
             self.editor_window.receive_tree(self.tree_model_manager, self.toolbar_manager)
             # Подключаем сигналы редактора к панели
-            self.editor_window.file_created.connect(self._on_file_created)
+            self.editor_window.observer.file_created.connect(self._on_file_created)
         self.editor_window.show()
 
 

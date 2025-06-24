@@ -343,3 +343,6 @@ class TreeModelManager:
     def get_item_level(self, index: QModelIndex) -> int:
         """Возвращает уровень вложенности элемента (0 для корня)."""
         return self.tree_model.get_item_level(index)
+
+    def get_model(self):
+        return self.tree_model
