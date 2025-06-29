@@ -291,13 +291,6 @@ class SidePanel(QWidget):
         else:
             QMessageBox.warning(self, "Ошибка", message)
 
-    def _open_editor(self):
-        """Открыть окно редактора файла"""
-        if not hasattr(self, 'editor_window'):
-            self.editor_window = FileEditorWindow(self)
-            # Подключаем сигналы редактора к панели
-            self.editor_window.file_created.connect(self._on_file_created)
-        self.editor_window.show()
 
 
     def _on_file_created(self, file_path):

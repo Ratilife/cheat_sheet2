@@ -206,6 +206,7 @@ class FileEditorWindow(QMainWindow):
 
     def _show_tree_context_menu(self, pos):
         """Показывает контекстное меню для дерева файлов"""
+        # ✅ Реализовано: 29.06.2025
         self.context_menu_handler.show_tree_context_menu(pos)
 
     def _remove_item(self, index, delete_from_disk=False):
