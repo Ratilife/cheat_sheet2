@@ -10,23 +10,7 @@ class FileManager:
         self.st_parser = STFileParserWrapper()
         self.md_parser = MarkdownListener()
 
-    def save_files_to_json(self):
-        """Сохраняет список загруженных файлов в JSON"""
-        save_path = self._get_save_path()
-        files = []
 
-        # Собираем пути всех загруженных файлов (как st, так и md)
-        for i in range(len(self.tree_model.root_item.child_items)):
-            item = self.tree_model.root_item.child_items[i]
-            if item.item_data[1] in ["file", "markdown"]:  # Изменено условие
-                files.append({
-                    "path": item.item_data[2],
-                    "type": item.item_data[1]  # Сохраняем тип файла
-                })
-
-        # Сохраняем в JSON
-        with open(save_path, 'w', encoding='utf-8') as f:
-            json.dump(files, f, ensure_ascii=False, indent=4)
 
     def load_saved_files(self):
         """Загружает сохраненные файлы из JSON"""
@@ -81,7 +65,29 @@ class FileManager:
         )
         return files
 
+    def _save_file_as(self):
+        """Сохранение файла под новым именем"""
+        if not self.current_file_path:
+            default_path = ""
+            default_ext = "st"
+        else:
+            default_path = self.current_file_path
+            default_ext = "md" if self.current_file_path.endswith('.md') else "st"
 
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Сохранить файл как",
+            default_path,
+            f"{default_ext.upper()} Files (*.{default_ext})"
+        )
+
+        if file_path:
+            # Добавляем расширение, если его нет
+            if not file_path.endswith(f'.{default_ext}'):
+                file_path += f'.{default_ext}'
+
+            self.current_file_path = file_path
+            self._save_file()  # Сохраняем файл
 
     def open_file(self):
         """Открытие существующего файла через диалог"""
@@ -177,29 +183,6 @@ class FileManager:
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл: {str(e)}")
 
-    def _save_file_as(self):
-        """Сохранение файла под новым именем"""
-        if not self.current_file_path:
-            default_path = ""
-            default_ext = "st"
-        else:
-            default_path = self.current_file_path
-            default_ext = "md" if self.current_file_path.endswith('.md') else "st"
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Сохранить файл как",
-            default_path,
-            f"{default_ext.upper()} Files (*.{default_ext})"
-        )
-
-        if file_path:
-            # Добавляем расширение, если его нет
-            if not file_path.endswith(f'.{default_ext}'):
-                file_path += f'.{default_ext}'
-
-            self.current_file_path = file_path
-            self._save_file()  # Сохраняем файл
 
     def _save_st_file(self):
         """
@@ -274,3 +257,22 @@ class FileManager:
             return True
         except Exception as e:
             raise Exception(f"Ошибка создания MD-файла: {str(e)}")
+
+    def save_files_to_json(self):
+        """Сохраняет список загруженных файлов в JSON"""
+        # ✅ Реализовано: 29.06.2025
+        save_path = self._get_save_path()
+        files = []
+
+        # Собираем пути всех загруженных файлов (как st, так и md)
+        for i in range(len(self.tree_model.root_item.child_items)):
+            item = self.tree_model.root_item.child_items[i]
+            if item.item_data[1] in ["file", "markdown"]:  # Изменено условие
+                files.append({
+                    "path": item.item_data[2],
+                    "type": item.item_data[1]  # Сохраняем тип файла
+                })
+
+        # Сохраняем в JSON
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(files, f, ensure_ascii=False, indent=4)

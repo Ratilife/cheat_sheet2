@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QIcon
 from preparation.editor2.widgets.delegates import TreeItemDelegate
 from preparation.editor2.observers.my_base_observer import MyBaseObserver
+from preparation.editor2.managers.context_menu_manager import ContextMenuHandler
 
 
 class FileEditorWindowObserver(MyBaseObserver):
@@ -18,12 +19,13 @@ class FileEditorWindow(QMainWindow):
         Обеспечивает создание, редактирование и сохранение файлов.
     """
 
-    def __init__(self): # TODO - убрать параметры toolbar_manager и parent
+    def __init__(self, tree_model_manager=None, toolbar_manager=None):
 
         super().__init__()
         self.tree_view = QTreeView()
         #Создаем экземпляр класса для сигналов
         self.observer = FileEditorWindowObserver()
+
 
         self.setWindowTitle("Редактор файлов")
         self.setMinimumSize(600, 500)  # Минимальные размеры окна
@@ -41,10 +43,15 @@ class FileEditorWindow(QMainWindow):
         self.delegate = TreeItemDelegate(parent=self.tree_view, config=delegate_config)  # ← Конфиг
         self.tree_view.setItemDelegate(self.delegate)
         #self._init_ui()  # Инициализация интерфейса
+        # Инициализация UI, если менеджеры переданы
+        if tree_model_manager and toolbar_manager:
+            self._setup_managers(tree_model_manager, toolbar_manager)
 
 
     def _init_ui(self):
         """Инициализация пользовательского интерфейса"""
+        if not hasattr(self, 'parent_toolbar'):
+            raise RuntimeError("toolbar_manager не установлен. Вызовите setup_managers()")
         # Основной виджет и layout
         main_widget = QWidget()                     # Создаем центральный виджет окна
         self.setCentralWidget(main_widget)          # Устанавливаем его как центральный виджет окна
@@ -62,8 +69,7 @@ class FileEditorWindow(QMainWindow):
         #Создаем панель инструментов над деревом
         toolbar_to_tree_layout = self.parent_toolbar.get_above_tree_toolbar_editor()
         main_layout.addWidget(toolbar_to_tree_layout)
-        # Подключаем сигнал получения дерева
-        self.observer.file_selected.connect(self.receive_tree)
+
 
         # Контейнер для редактора и кнопок
         editor_container = QWidget()  # Контейнерный виджет
@@ -101,11 +107,17 @@ class FileEditorWindow(QMainWindow):
         # чтобы при вызове контекстного меню отобразить пользовательское меню.
         self.tree_view.customContextMenuRequested.connect(self._show_tree_context_menu) #TODO - доработать
 
+
+
         # Установите делегат (если он используется)
         if hasattr(self.tree_model, 'delegate'):
             # Создаем новый делегат на основе родительского, но для текущего tree_view
             self.delegate = TreeItemDelegate(self.tree_view)
             self.tree_view.setItemDelegate(self.delegate)
+        #Подключение контекстного меню к tree_view
+        self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree_view.customContextMenuRequested.connect(
+        self.context_menu_handler.show_tree_context_menu)
 
         # Настройте стиль (можно скопировать из панели)
         self.tree_view.setStyleSheet("""
@@ -153,13 +165,20 @@ class FileEditorWindow(QMainWindow):
         frame_geometry.moveCenter(screen_center)  # Совмещаем центры
         self.move(frame_geometry.topLeft())  # Перемещаем окно
 
-    def receive_tree(self, tree_model_manager, toolbar_manager):
-        """Получаем модель дерева и отображаем ее """
+    def _setup_managers(self, tree_model_manager, toolbar_manager):
+        """Устанавливает менеджеры и инициализирует интерфейс"""
+        # ✅ Реализовано: 29.06.2025
+        if not tree_model_manager or not toolbar_manager:
+            raise ValueError("tree_model_manager и toolbar_manager обязательны")
         self.tree_model = tree_model_manager.get_model()
         self.parent_toolbar = toolbar_manager
+        #Подключение контекстного меню к tree_view
+        self.context_menu_handler = ContextMenuHandler(
+            tree_view=self.tree_view,
+            delete_manager=tree_model_manager.delete_manager
+        )
         self._init_ui()
         self.tree_view.setModel(self.tree_model)
-        self.parent_toolbar = toolbar_manager
 
 
     #---- Нужно проверить методы -------
@@ -191,4 +210,4 @@ class FileEditorWindow(QMainWindow):
 
     def _remove_item(self, index, delete_from_disk=False):
         if self.delete_manager.execute_removal(index, delete_from_disk):
-            self._save_files_to_json()
+            self.toolbar_manager.save_files_to_json()

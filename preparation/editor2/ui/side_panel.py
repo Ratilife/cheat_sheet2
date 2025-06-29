@@ -16,6 +16,7 @@ from preparation.editor2.widgets.delegates import TreeItemDelegate
 from preparation.editor2.utils.tree_manager import TreeManager
 from preparation.editor2.operation.file_operations import FileOperations
 from preparation.editor2.observers.my_base_observer import MyBaseObserver
+from preparation.editor2.managers.context_menu_manager import ContextMenuHandler
 
 
 # Класс для обработки сигналов панели
@@ -85,6 +86,16 @@ class SidePanel(QWidget):
         self.tree_manager = TreeManager(self.tree_view)
         self.toolbar_manager = ToolbarManager(self.tree_manager,self.close,self.showMinimized)
         self.toolbar_manager.set_tree_model(self.tree_model_manager)
+
+        self.context_menu_handler = ContextMenuHandler(
+            tree_view=self.tree_view,
+            delete_manager=self.tree_model_manager.delete_manager
+        )
+        #Подключение контекстного меню к tree_view
+        self.tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree_view.customContextMenuRequested.connect(
+            self.context_menu_handler.show_tree_context_menu
+        )
 
         # Устанавливаем минимальную ширину панели
         self.setMinimumWidth(300)
@@ -372,9 +383,9 @@ class SidePanel(QWidget):
 
     def _open_editor(self):
         """Открыть окно редактора файла"""
+        # ✅ Реализовано: 29.06.2025
         if not hasattr(self, 'editor_window'):
-            self.editor_window = FileEditorWindow()
-            self.editor_window.receive_tree(self.tree_model_manager, self.toolbar_manager)
+            self.editor_window = FileEditorWindow(self.tree_model_manager, self.toolbar_manager)
             # Подключаем сигналы редактора к панели
             self.editor_window.observer.file_created.connect(self._on_file_created)
         self.editor_window.show()
