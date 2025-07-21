@@ -293,16 +293,6 @@ class SidePanel(QWidget):
 
 
 
-    def _on_file_created(self, file_path):
-        """Обработчик сигнала о создании файла"""
-        try:
-            self.file_operations.add_file_to_tree(file_path)
-            self.tree_model_manager.file_manager.save_files_to_json() #TODO присмотрться
-            self.tree_view.expandAll()  # заменить код
-        except Exception as e:
-            print(f"Ошибка при добавлении файла в дерево: {e}")
-            # Можно добавить QMessageBox для показа ошибки пользователю
-            QMessageBox.warning(self, "Ошибка", f"Не удалось добавить файл в дерево: {str(e)}")
 
     def _on_tree_item_clicked(self, index):
         """Обработка клика по элементу дерева с корректной работой FileWatcher"""
@@ -380,7 +370,7 @@ class SidePanel(QWidget):
         if not hasattr(self, 'editor_window'):
             self.editor_window = FileEditorWindow(self.tree_model_manager, self.toolbar_manager)
             # Подключаем сигналы редактора к панели
-            self.editor_window.observer.file_created.connect(self._on_file_created)
+            #self.editor_window.observer.file_created.connect(self._on_file_created) #TODO ?
         self.editor_window.show()
 
 

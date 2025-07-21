@@ -19,9 +19,10 @@ class FileEditorWindow(QMainWindow):
         Обеспечивает создание, редактирование и сохранение файлов.
     """
 
-    def __init__(self, tree_model_manager=None, toolbar_manager=None):
+    def __init__(self, parent=None):
 
-        super().__init__()
+        super().__init__(parent)
+        self.parent = parent
         self.tree_view = QTreeView()
         #Создаем экземпляр класса для сигналов
         self.observer = FileEditorWindowObserver()
@@ -44,8 +45,8 @@ class FileEditorWindow(QMainWindow):
         self.tree_view.setItemDelegate(self.delegate)
         #self._init_ui()  # Инициализация интерфейса
         # Инициализация UI, если менеджеры переданы
-        if tree_model_manager and toolbar_manager:
-            self._setup_managers(tree_model_manager, toolbar_manager)
+        if self.parent.tree_model_manager and self.parent.toolbar_manager:
+            self._setup_managers(self.parent.tree_model_manager, self.parent.toolbar_manager)
 
 
     def _init_ui(self):
@@ -160,6 +161,7 @@ class FileEditorWindow(QMainWindow):
                 """)
     def center_window(self):
         """Центрирует окно на экране"""
+        # ✅ Реализовано: 19.06.2025
         frame_geometry = self.frameGeometry()  # Получаем геометрию окна с учетом рамок
         screen_center = QApplication.primaryScreen().availableGeometry().center()  # Центр экрана
         frame_geometry.moveCenter(screen_center)  # Совмещаем центры
@@ -171,6 +173,7 @@ class FileEditorWindow(QMainWindow):
         if not tree_model_manager or not toolbar_manager:
             raise ValueError("tree_model_manager и toolbar_manager обязательны")
         self.tree_model = tree_model_manager.get_model()
+
         self.parent_toolbar = toolbar_manager
         #Подключение контекстного меню к tree_view
         self.context_menu_handler = ContextMenuHandler(
@@ -212,3 +215,15 @@ class FileEditorWindow(QMainWindow):
     def _remove_item(self, index, delete_from_disk=False):
         if self.delete_manager.execute_removal(index, delete_from_disk):
             self.toolbar_manager.save_files_to_json()
+
+    def _on_file_created(self, file_path):
+        """Обработчик сигнала о создании файла"""
+        try:
+            self
+            self.file_operations.add_file_to_tree(file_path)
+            self.tree_model_manager.file_manager.save_files_to_json() #TODO присмотрться
+            self.tree_view.expandAll()  # заменить код
+        except Exception as e:
+            print(f"Ошибка при добавлении файла в дерево: {e}")
+            # Можно добавить QMessageBox для показа ошибки пользователю
+            QMessageBox.warning(self, "Ошибка", f"Не удалось добавить файл в дерево: {str(e)}")

@@ -20,13 +20,13 @@ class TreeModelManager:
 
     def __init__(self):
         self.tree_model = STFileTreeModel()
-        self.st_parser = STFileParserWrapper()  #TODO выкинуть из модуля
-        self.md_parser = MarkdownListener()  #TODO выкинуть из модуля
-        self.delete_manager = DeleteManager(self.tree_model, self.st_parser)
+        #self.st_parser = STFileParserWrapper()  #TODO выкинуть из модуля
+        #self.md_parser = MarkdownListener()  #TODO выкинуть из модуля
+        #self.delete_manager = DeleteManager(self.tree_model, self.st_parser)
 
         # Добавляем FileManager
-        self.file_manager = FileManager()  #TODO ?
-        self.file_manager.tree_model = self.tree_model  # Передаем модель в FileManager
+        #self.file_manager = FileManager()  #TODO ?
+        #self.file_manager.tree_model = self.tree_model  # Передаем модель в FileManager
 
 
 
